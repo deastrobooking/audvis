@@ -26,11 +26,22 @@ class AUDVIS_OT_midiFileOpen(Operator, ImportHelper):
         default=True
     )
 
+    midi_note_base: bpy.props.EnumProperty(
+        name="Midi base",
+        description="AudVis internally uses C-1=0. Here you can adjust imported data",
+        items = [
+            ("-2", "C-2=0 ; C4=72", ""),
+            ("-1", "C-1=0 ; C4=60", ""),
+            ("0", "C0=0 ; C4=48", ""),
+        ],
+        default="-1"
+    )
+
     @classmethod
     def poll(cls, context):
         return bpy.audvis.is_midi_realtime_supported()
 
     def execute(self, context):
-        midi_file_baker.bake(context.scene, self.filepath, self.strip_silent_start)
+        midi_file_baker.bake(context.scene, self.filepath, self.strip_silent_start, self.midi_note_base)
 
         return {'FINISHED'}

@@ -1,12 +1,8 @@
 import bpy
 
-MidiNoteMap = {
-    'A0': 21,
-    'A#0': 22,
-    'Bb0': 22,
-    'B0': 23,
-}
-for octave in [1, 2, 3, 4, 5, 6, 7, 8, 9]:
+MidiNoteMap = {}
+
+for octave in range(-2, 10):
     for i, (note, offset) in enumerate({
                                            'C': 0,
                                            'C#': 1, 'Db': 1,
@@ -22,8 +18,6 @@ for octave in [1, 2, 3, 4, 5, 6, 7, 8, 9]:
                                            'B': 11,
                                        }.items()):
         MidiNoteMap[note + str(octave)] = 24 + ((octave - 1) * 12) + offset
-        if note == 'Ab' and octave == 9:
-            break
 
 
 def midi_note_to_number(value):

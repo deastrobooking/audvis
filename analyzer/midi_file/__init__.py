@@ -86,6 +86,8 @@ class MidiFileAnalyzer(Analyzer):
                 return self._midi_multi_note_driver(low=None, high=None, ch=None, **kwargs)
             else:
                 midi_note = midi_note_to_number(midi_note)
+        elif type(midi_note) is str:
+            midi_note = midi_note_to_number(midi_note)
         track = kwargs.get("track", None)
         file = kwargs.get("file", None)
         if data is None:

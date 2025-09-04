@@ -50,7 +50,7 @@ def _generate_track_name(orig_track_name, track_index, midifile):
     return name
 
 
-def _create_fcurves_in_order(scene, track_item, midifile, track):
+def _create_fcurves_in_order(scene, track_item, midifile, track, note_adjust):
     tmp_list = []
     if scene.animation_data is None:
         scene.animation_data_create()
@@ -59,7 +59,7 @@ def _create_fcurves_in_order(scene, track_item, midifile, track):
     # create the fcurves in nice order:
     for msg in track['msgs']:
         if msg.type in ('note_on', 'note_off'):
-            key = "ch{}_n{}".format(msg.channel + 1, msg.note)
+            key = "ch{}_n{}".format(msg.channel + 1, msg.note + note_adjust)
             tmp_item = (
                 msg.channel,
                 msg.note,
@@ -77,7 +77,7 @@ def _create_fcurves_in_order(scene, track_item, midifile, track):
         track_item.keyframe_insert(keyframe_key, frame=-1, group=midifile.name)
 
 
-def bake(scene, filepath: str, strip_silent_start: bool):
+def bake(scene, filepath: str, strip_silent_start: bool, midi_note_base: str):
     import mido
 
     mid = mido.midifiles.MidiFile(filename=filepath, ticks_per_beat=480, charset='latin1')
@@ -94,7 +94,7 @@ def bake(scene, filepath: str, strip_silent_start: bool):
             midifile.name = name
             break
         if i == 999:
-            midifile.name = name + str(random.randint())
+            midifile.name = name + str(random.randint(10000, 90000000))
     midifile.time_length = mid.length
     midifile.fps_when_loaded = fps
     overall_offset_time = 0.0
@@ -108,6 +108,13 @@ def bake(scene, filepath: str, strip_silent_start: bool):
             if msg.type == 'note_on':
                 overall_offset_time = -timer
                 break
+    if midi_note_base == '-2':
+        note_adjust = 12
+    elif midi_note_base == '0':
+        note_adjust = -12
+    else:
+        note_adjust = 0
+
     # nla_action = bpy.data.actions.new(name=midifile.name)
     # nla_tracks = {}
     for track_index, track in enumerate(_testing_mergetracks(mid)):
@@ -115,14 +122,14 @@ def bake(scene, filepath: str, strip_silent_start: bool):
         name = _generate_track_name(track['name'], track_index, midifile)
         track_item.name = name
         counter = 0
-        _create_fcurves_in_order(scene, track_item, midifile, track)
+        _create_fcurves_in_order(scene, track_item, midifile, track, note_adjust)
         for msg in track['msgs']:
             if msg.type in ('note_on', 'note_off', 'control_change'):
                 counter += 1
                 if msg.type == 'control_change':
                     key = "ch{}_c{}".format(msg.channel + 1, msg.control)
                 else:
-                    key = "ch{}_n{}".format(msg.channel + 1, msg.note)
+                    key = "ch{}_n{}".format(msg.channel + 1, msg.note + note_adjust)
                 keyframe_key = '["{}"]'.format(key)
                 if key not in track_item:
                     track_item[key] = 0.0
