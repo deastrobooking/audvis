@@ -23,16 +23,16 @@ class AUDVIS_OT_midiFileOpen(Operator, ImportHelper):
         name="Strip Silent Beginning of MIDI",
         description="MIDI files use to have sometimes quite a long time from beginning to first note."
                     " This cuts that empty, silent part.",
-        default=True
+        default=False
     )
 
     midi_note_base: bpy.props.EnumProperty(
         name="Midi base",
         description="AudVis internally uses C-1=0. Here you can adjust imported data",
         items = [
-            ("-2", "C-2=0 ; C4=72", ""),
-            ("-1", "C-1=0 ; C4=60", ""),
-            ("0", "C0=0 ; C4=48", ""),
+            ("-2", "MIDI Note 60 (Middle-C) is C3 (Ableton, Cubase, Bitwig, Studio One...)", ""),
+            ("-1", "MIDI Note 60 (Middle-C) is C4 (Renoise, Roland, Reaper default...)", ""),
+            ("0", "MIDI Note 60 (Middle-C) is C5 (FL-Studio...)", ""),
         ],
         default="-1"
     )
