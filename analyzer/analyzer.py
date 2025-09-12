@@ -51,6 +51,8 @@ class Analyzer:
             return 0
         if low == 'max' and high is None:
             return np.argmax(fft[ch - 1]) * self.resolution_step
+        if low == 'amp' and high is None:
+            return math.fabs(self.lastdata[ch - 1][-1])
         i_from = math.floor(low / self.resolution_step)
         i_to = math.ceil(high / self.resolution_step)
         lst = fft[ch - 1][i_from:i_to]
