@@ -1,11 +1,16 @@
+from ..utils import get_all_vse_strips
+
+
 def generators_ui_sequence(self, context, props):
     col = self.layout.column(align=True)
     col.prop(props, "channel")
     if context.scene.sequence_editor:
-        col.prop_search(props, "sound_sequence", context.scene.sequence_editor, "sequences_all",
+        col.prop_search(props, "sound_sequence", context.scene.sequence_editor,
+                        "sequences_all" if hasattr(context.scene.sequence_editor, "sequences_all") else "strips_all",
                         icon='SOUND')
-        if props.sound_sequence in context.scene.sequence_editor.sequences_all:
-            sequence = context.scene.sequence_editor.sequences_all[props.sound_sequence]
+        all_strips = get_all_vse_strips(context.scene)
+        if props.sound_sequence in all_strips:
+            sequence = all_strips[props.sound_sequence]
             if sequence.type != 'SOUND':
                 row = col.row()
                 row.alert = True

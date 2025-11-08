@@ -1,5 +1,6 @@
 import bpy
 
+from ...utils import get_all_vse_strips
 from . import (
     spectrogram,
     animationnodes,
@@ -29,7 +30,7 @@ class AudvisSceneProperties(bpy.types.PropertyGroup):
         res = [("", "---", "")]
         if context.scene.sequence_editor is None:
             return res
-        for seq in context.scene.sequence_editor.sequences_all:
+        for seq in get_all_vse_strips(context.scene):
             if seq.type == 'SOUND':
                 res.append((seq.name, seq.name, seq.name))
         return res

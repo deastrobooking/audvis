@@ -1,7 +1,10 @@
+import os
 import bpy
 from bpy.types import (Operator, UIList)
+from bpy_extras.io_utils import ImportHelper
 
 from .buttonspanel import AudVisButtonsPanel_Npanel
+from ..utils import get_all_vse_strips
 
 
 def _seq_has_error(name):
@@ -17,8 +20,9 @@ def _get_selected_sound_sequence(context):
     if context.scene.sequence_editor is None:
         return None
     props = context.scene.audvis
-    if 0 <= props.sequence_list_index < len(context.scene.sequence_editor.sequences_all):
-        seq = context.scene.sequence_editor.sequences_all[props.sequence_list_index]
+    seq_all = get_all_sound_sequences(context)
+    if 0 <= props.sequence_list_index < len(seq_all):
+        seq = seq_all[props.sequence_list_index]
         if seq.type == 'SOUND':
             return seq
     return None
@@ -51,11 +55,11 @@ class AUDVIS_UL_soundSequenceList(UIList):
 def get_all_sound_sequences(context):
     try:
         ret = []
-        for seq in context.scene.sequence_editor.sequences_all:
+        for seq in get_all_vse_strips(context.scene):
             if seq.type == 'SOUND':
                 ret.append(seq)
         return ret
-    except AttributeError:
+    except AttributeError as e:
         return []
 
 
@@ -85,28 +89,58 @@ class AUDVIS_OT_SequenceRemove(Operator):
     def execute(self, context):
         seq = _get_selected_sound_sequence(context)
         if seq is not None:
-            for seq2 in list(context.scene.sequence_editor.sequences_all):
+            for seq2 in list(get_all_vse_strips(context.scene)):
                 seq2.select = False
             seq.select = True
             bpy.ops.sequencer.delete()
         return {'FINISHED'}
 
 
-class AUDVIS_OT_SequenceAdd(Operator):
+class AUDVIS_OT_SequenceAdd(Operator, ImportHelper):
     bl_idname = "audvis.sequence_add"
     bl_label = "Add Sound Sequence"
 
-    filepath: bpy.props.StringProperty(subtype="FILE_PATH")
+    filename_ext: bpy.props.StringProperty(default=";".join(bpy.path.extensions_audio))
+    filter_glob: bpy.props.StringProperty(
+        default=";".join(["*" + ext for ext in bpy.path.extensions_audio]),
+        options={'HIDDEN'},
+    )
+    files: bpy.props.CollectionProperty(
+        name="File Path",
+        type=bpy.types.OperatorFileListElement,
+    )
+    directory: bpy.props.StringProperty(
+        subtype='DIR_PATH',
+    )
+
+    # filter_glob = ";".join(["*." + ext for ext in bpy.path.extensions_audio])
+
+    def _find_free_channel(self, context):
+        free_channels = [True for x in range(len(context.scene.sequence_editor.channels))]
+        for tmp in context.scene.sequence_editor.strips_all:
+            free_channels[tmp.channel - 1] = False
+        if True not in free_channels:
+            return {"CANCELLED"}
+        if True in free_channels:
+            return free_channels.index(True) + 1
+        return -1
 
     def execute(self, context):
-        curr_area_type = context.area.type
-        context.area.type = 'SEQUENCE_EDITOR'
-        try:
-            bpy.ops.sequencer.sound_strip_add('INVOKE_DEFAULT')
-        except:
-            pass
-        finally:
-            context.area.type = curr_area_type
+        context.scene.sequence_editor_create()
+        channel = self._find_free_channel(context)
+        if channel == -1:
+            return {"CANCELLED"}
+        frame = 0
+        for filepath in self.files:
+            strip = getattr(context.scene.sequence_editor,
+                            "strips" if hasattr(context.scene.sequence_editor, "strips") else "sequences").new_sound(
+                name=filepath.name,
+                filepath=os.path.join(self.directory, filepath.name),
+                channel=channel,
+                frame_start=frame)
+            if strip:
+                frame = strip.frame_final_end
+
         return {"FINISHED"}
 
 
@@ -126,7 +160,8 @@ class AUDVIS_PT_sequenceNpanel(AudVisButtonsPanel_Npanel):
         layout = self.layout
         col = layout.column(align=True)
         col.template_list("AUDVIS_UL_soundSequenceList", "sound_sequence_list",
-                          context.scene.sequence_editor, "sequences_all",
+                          context.scene.sequence_editor,
+                          "sequences_all" if hasattr(context.scene.sequence_editor, "sequences_all") else "strips_all",
                           props, "sequence_list_index")
         row = col.row()
         row.operator("audvis.sequence_add")

@@ -1,3 +1,4 @@
+from ...utils import get_all_vse_strips
 from . import lib
 from . import vertexweight, greasepencil, uv, vertcolor
 from ..analyzer import Analyzer
@@ -37,7 +38,7 @@ class ShapeModifier(Analyzer):
     def on_pre_frame(self, scene, frame):
         objects = []
         if scene.sequence_editor is not None:
-            for seq in scene.sequence_editor.sequences_all:
+            for seq in get_all_vse_strips(scene):
                 if seq.frame_final_start <= frame <= seq.frame_final_end:
                     if seq.type == 'SCENE' and seq.scene.audvis.shapemodifier_enable:
                         objects += [obj for obj in seq.scene.objects if obj.audvis.shapemodifier.enable]

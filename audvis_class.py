@@ -5,6 +5,7 @@ import time
 
 import bpy
 
+from .utils import get_all_vse_strips
 from .analyzer import nonstop_baking
 from .analyzer.analyzer import Analyzer
 from .analyzer.midi_file import MidiFileAnalyzer
@@ -113,7 +114,7 @@ class AudVis:
                 and scene.audvis.sequence_enable \
                 and "midi" not in kwargs \
                 and "midi_control" not in kwargs:
-            for seq in scene.sequence_editor.sequences_all:
+            for seq in get_all_vse_strips(scene):
                 if seq.type != 'SOUND':
                     continue
                 if not hasattr(seq, "audvis"):
@@ -271,14 +272,15 @@ class AudVis:
         if not scene.audvis.sequence_enable:
             return
         keys = dict.fromkeys(self.sequence_analyzers.keys(), [])
+        seq_all = get_all_vse_strips(scene)
         for seqname in keys:
-            if not seqname in scene.sequence_editor.sequences_all:
+            if not seqname in seq_all:
                 self.sequence_analyzers.pop(seqname)
                 continue
-            seq = scene.sequence_editor.sequences_all[seqname]
+            seq = seq_all[seqname]
             if not seq.audvis.enable:
                 self.sequence_analyzers.pop(seqname)
-        for seq in scene.sequence_editor.sequences_all:
+        for seq in seq_all:
             if not hasattr(seq, "audvis"):
                 continue
             if not seq.audvis.enable:

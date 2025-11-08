@@ -42,3 +42,9 @@ def call_ops_override(operator, override, **kwargs):
             operator(**kwargs)
     else:
         operator(override, **kwargs)
+
+
+def get_all_vse_strips(scene):
+    if hasattr(scene.sequence_editor, 'strips_all'):
+        return scene.sequence_editor.strips_all
+    return scene.sequence_editor.sequences_all

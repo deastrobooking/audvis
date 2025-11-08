@@ -1,6 +1,7 @@
 import bpy
 import os
 
+from ..utils import get_all_vse_strips
 from .analyzer import Analyzer
 
 
@@ -40,9 +41,10 @@ class SequenceAnalyzer(Analyzer):
             return
 
     def on_pre_frame(self, scene, frame):
-        if self.sequence not in scene.sequence_editor.sequences_all.values():  # pointer to sequence changes after any undo in Blender
-            if self.sequence_name in scene.sequence_editor.sequences_all:
-                self.sequence = scene.sequence_editor.sequences_all[self.sequence_name]  # try to fix missing sequence
+        seq_all = get_all_vse_strips(scene)
+        if self.sequence not in seq_all.values():  # pointer to sequence changes after any undo in Blender
+            if self.sequence_name in seq_all:
+                self.sequence = seq_all[self.sequence_name]  # try to fix missing sequence
             else:
                 self.empty()
                 return
