@@ -5,6 +5,7 @@ from bpy.types import (
 )
 import bpy
 
+from ....utils import action_remove_fcurves
 from ..utils import get_selected_midi_file
 
 
@@ -26,10 +27,7 @@ class AUDVIS_OT_midiFileRemove(Operator):
         if midifile is not None \
                 and context.scene.animation_data \
                 and context.scene.animation_data.action is not None:
-            fcurves = context.scene.animation_data.action.fcurves
-            for fcurve in fcurves:
-                if fcurve.data_path.startswith(midifile.path_from_id()):
-                    fcurves.remove(fcurve)
+            action_remove_fcurves(context.scene.animation_data.action, midifile.path_from_id())
             midifile.deleted = True
             midifile.enable = False
             midifile.name = '_deleted'

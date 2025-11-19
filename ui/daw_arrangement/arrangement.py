@@ -6,18 +6,23 @@ import numpy as np
 
 import bpy
 
+from ...utils import action_get_fcurves, action_add_fcurve
+
 
 def _get_tmp_fcurve(data_path="tmp"):
     action_name = "AudvisDawHelperAction"
-    if action_name in bpy.data.actions:
-        action = bpy.data.actions[action_name]
+    if action_name in bpy.data.objects:
+        obj = bpy.data.objects[action_name]
     else:
-        action = bpy.data.actions.new(action_name)
-    for fcurve in action.fcurves:
+        obj = bpy.data.objects.new(action_name, None)
+    anim_data = obj.animation_data_create()
+    if anim_data.action is None:
+        anim_data.action = bpy.data.actions.new(action_name)
+    for fcurve in action_get_fcurves(anim_data.action):
         if fcurve.data_path == data_path:
             fcurve.keyframe_points.clear()
             return fcurve
-    return action.fcurves.new(data_path)
+    return action_add_fcurve(anim_data.action, obj, data_path=data_path, index=0)
 
 
 class Audio:

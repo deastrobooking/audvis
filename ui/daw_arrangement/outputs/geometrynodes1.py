@@ -2,6 +2,7 @@ import math
 
 import bpy
 
+from ....utils import action_add_fcurve
 from ..arrangement import Arrangement, Clip
 from ...props.daw_arrangement import AudvisDawArrangement
 
@@ -109,7 +110,7 @@ class GeometryNodes1:
         obj.animation_data_create()
         if obj.animation_data.action is None:
             obj.animation_data.action = bpy.data.actions.new('NewAction')
-        fcurve = obj.animation_data.action.fcurves.new(data_path='location', index=0)
+        fcurve = action_add_fcurve(obj.animation_data.action, obj, data_path='location', index=0)
         time_points = arrangement.calc_tempo_to_time()
         for time_point in time_points:
             frame = (time_point[0] * scene.render.fps * scene.render.fps_base) + props.frame_start

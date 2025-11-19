@@ -3,6 +3,7 @@ from bpy.types import (
     Operator,
 )
 
+from ..utils import action_remove_fcurves
 from . import ui_lib
 from .buttonspanel import AudVisButtonsPanel_Npanel
 from .hz_label import hz_label, notes_label
@@ -281,10 +282,7 @@ class AUDVIS_OT_shapemodifierunbake(Operator):
 
     def _clean_fcurves(self, animation_data, data_path_pattern):
         try:
-            fcurves = animation_data.action.fcurves
-            for fcurve in list(fcurves):
-                if data_path_pattern in fcurve.data_path:
-                    fcurves.remove(fcurve)
+            action_remove_fcurves(animation_data.action, data_path_pattern)
         except Exception as e:
             pass
 

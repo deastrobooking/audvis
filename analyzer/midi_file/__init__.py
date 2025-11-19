@@ -1,6 +1,6 @@
 import re
 
-from ...utils import midi_note_to_number
+from ...utils import midi_note_to_number, action_get_fcurves
 from ..analyzer import Analyzer
 
 regexp = re.compile('ch([0-9]+)_(n|c)([0-9]+)')
@@ -36,7 +36,7 @@ class MidiFileAnalyzer(Analyzer):
             if not track.enable:
                 continue
             common_path = track.path_from_id()
-            for fcurve in scene.animation_data.action.fcurves:
+            for fcurve in action_get_fcurves(scene.animation_data.action):
                 if fcurve.data_path.startswith(common_path):
                     tmp = fcurve.data_path.replace(common_path, '').replace('["', '').replace('"]', '')
                     regexp_result = regexp.match(tmp)

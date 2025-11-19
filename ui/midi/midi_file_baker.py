@@ -1,8 +1,9 @@
 import os
 import random
 import re
-import math
 import bpy
+
+from ...utils import action_get_fcurves, action_add_fcurve
 
 
 def _testing_mergetracks(mid):
@@ -71,9 +72,7 @@ def _create_fcurves_in_order(scene, track_item, midifile, track, note_adjust):
     for tmp in tmp_list:
         keyframe_key = '["{}"]'.format(tmp[2])
         track_item[tmp[2]] = 0.0
-        scene.animation_data.action.fcurves.new(data_path=track_item.path_from_id() + keyframe_key,
-                                                index=-1,
-                                                action_group=midifile.name + ' | ' + track_item.name)
+        action_add_fcurve(scene.animation_data.action, scene, data_path=track_item.path_from_id() + keyframe_key, index=-1)
         track_item.keyframe_insert(keyframe_key, frame=-1, group=midifile.name)
 
 
@@ -151,8 +150,7 @@ def bake(scene, filepath: str, strip_silent_start: bool, midi_note_base: str):
 
     if scene.animation_data and scene.animation_data.action:
         base_path = midifile.path_from_id('tracks')
-        for fcurve in scene.animation_data.action.fcurves:
+        for fcurve in action_get_fcurves(scene.animation_data.action):
             if fcurve.data_path.startswith(base_path):
                 for kp in fcurve.keyframe_points:
                     kp.interpolation = 'CONSTANT'
-                # print(fcurve.data_path)

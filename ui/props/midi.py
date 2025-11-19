@@ -1,5 +1,6 @@
 import bpy
 
+from ...utils import action_get_fcurves
 from .. import midi as ui_midi
 
 
@@ -44,7 +45,7 @@ class AudvisMidiFileProperties(bpy.types.PropertyGroup):  # custom properties fo
         if new_fps == old_fps:
             return
         base_data_path = self.path_from_id()
-        for fcurve in scene.animation_data.action.fcurves:
+        for fcurve in action_get_fcurves(scene.animation_data.action):
             if not fcurve.data_path.startswith(base_data_path):
                 continue
             for point in fcurve.keyframe_points:
