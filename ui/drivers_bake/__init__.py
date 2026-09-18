@@ -1,5 +1,7 @@
 import bpy
 
+from ...grease_pencil_compat import data_collection
+
 from ..buttonspanel import AudVisButtonsPanel_Npanel
 
 _is_baking = False
@@ -24,7 +26,7 @@ class DriverBakery:
             bpy.data.cameras,
             bpy.data.curves,
             # FreestyleLineStyle,
-            bpy.data.grease_pencils,
+            data_collection(bpy.data),
             bpy.data.shape_keys,
             bpy.data.lattices,
             bpy.data.lights,
