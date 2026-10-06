@@ -36,6 +36,16 @@ class AUDVIS_PT_audvisNpanel(AudVisButtonsPanel_Npanel):
     def draw(self, context):
         layout = self.layout
 
+        # Quick scene launcher. A grid keeps this useful for projects with a
+        # handful of scenes without taking over the rest of the AudVis panel.
+        box = layout.box()
+        box.label(text="Scenes", icon='SCENE_DATA')
+        grid = box.grid_flow(row_major=True, columns=3, even_columns=True, even_rows=True, align=True)
+        for scene in bpy.data.scenes:
+            op = grid.operator("audvis.scene_select", text=scene.name,
+                               depress=context.window.scene == scene)
+            op.scene_name = scene.name
+
         col = layout.column(align=True)
         row = col.row()
         row.label(text="Sync Mode:")
@@ -63,6 +73,24 @@ class AUDVIS_OT_copyString(bpy.types.Operator):
     def execute(self, context):
         context.window_manager.clipboard = self.value
         return {"FINISHED"}
+
+
+class AUDVIS_OT_scene_select(bpy.types.Operator):
+    """Switch the active window to a project scene from the AudVis grid."""
+
+    bl_idname = "audvis.scene_select"
+    bl_label = "Switch Scene"
+    bl_options = {'UNDO'}
+
+    scene_name: bpy.props.StringProperty(name="Scene")
+
+    def execute(self, context):
+        scene = bpy.data.scenes.get(self.scene_name)
+        if scene is None:
+            self.report({'WARNING'}, "Scene no longer exists")
+            return {'CANCELLED'}
+        context.window.scene = scene
+        return {'FINISHED'}
 
 
 class AudvisWindowProperties(bpy.types.PropertyGroup):
@@ -108,6 +136,7 @@ def on_blendfile_save():
 
 classes = [
               AUDVIS_OT_copyString,
+              AUDVIS_OT_scene_select,
               AUDVIS_PT_audvisNpanel,
               AudvisWindowProperties,
           ] \
