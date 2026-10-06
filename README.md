@@ -42,6 +42,7 @@ and optionally the packaged extension ZIP after Blender's `--` argument.
 ## Documentation:
 
 * [Installing python packages](doc/packages-install.md)
+* [Performing Live Visuals (shortcuts, scene switching, Party Mode)](doc/performing.md)
 * Analyzers:
     - [Sequence Analyzer](doc/sequence.md)
     - [Realtime Analyzer](doc/realtime.md)
