@@ -35,44 +35,46 @@ def try_switch_scenes(current_scene):
     if set_this_scene is None:
         set_this_scene = bpy.data.scenes[0]
     _skip_to_start(current_scene)
-    _skip_to_start(set_this_scene)
-    bpy.context.window.scene = set_this_scene
-    # Scene changes are evaluated after this handler returns in newer Blender
-    # versions. Toggling playback synchronously can therefore leave playback
-    # paused until the user presses Play. Resume on the next main-loop tick.
-    _resume_playback_after_scene_change()
+    switch_window_scene(bpy.context.window, set_this_scene)
     return True
+
+
+def switch_window_scene(window, scene):
+    """Show `scene` in `window` from its first frame and (re)start playback."""
+    _skip_to_start(scene)
+    window.scene = scene
+    # Scene changes are evaluated after the caller returns in newer Blender
+    # versions, so restarting playback synchronously can leave it stopped (or
+    # stuck bouncing between frames). Restart on the next main-loop tick.
+    _restart_playback(window)
 
 
 def _skip_to_start(scene):
     scene.frame_current = scene.frame_start
 
 
-def _resume_playback_after_scene_change():
+def _restart_playback(window):
     attempts = 0
 
-    def resume():
+    def restart():
         nonlocal attempts
         attempts += 1
-        windows = list(getattr(bpy.context.window_manager, "windows", ()))
-        if not windows and bpy.context.window is not None:
-            windows = [bpy.context.window]
-        for window in windows:
-            screen = window.screen
-            try:
-                with bpy.context.temp_override(window=window, screen=screen):
-                    # A normal scene swap leaves playback stopped. If the
-                    # flag is stale and still says playing, the first toggle
-                    # pauses it and the second starts it again.
-                    was_playing = bool(screen.is_animation_playing)
-                    bpy.ops.screen.animation_play()
-                    if was_playing:
-                        bpy.ops.screen.animation_play()
-                    return None
-            except (RuntimeError, AttributeError):
-                continue
-        # Scene evaluation and operator context can take more than one tick.
-        # Give Blender a bounded retry window, then leave its state alone.
-        return 0.05 if attempts < 40 else None
+        wm = bpy.context.window_manager
+        if wm is None or window not in list(wm.windows):
+            return None  # window was closed
+        screen = window.screen
+        try:
+            with bpy.context.temp_override(window=window, screen=screen):
+                # Always cancel the old playback first: its timer is still
+                # bound to the previous scene. Then play explicitly instead
+                # of toggling, so a stale playing-flag can't leave it paused.
+                if screen.is_animation_playing:
+                    bpy.ops.screen.animation_cancel(restore_frame=False)
+                bpy.ops.screen.animation_play()
+            return None
+        except (RuntimeError, AttributeError):
+            # Scene evaluation and operator context can take more than one
+            # tick. Give Blender a bounded retry window, then leave it alone.
+            return 0.05 if attempts < 40 else None
 
-    bpy.app.timers.register(resume, first_interval=0.0)
+    bpy.app.timers.register(restart, first_interval=0.0)

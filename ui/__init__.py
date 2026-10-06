@@ -1,5 +1,10 @@
-import bpy
+import colorsys
+import zlib
 
+import bpy
+import bpy.utils.previews
+
+from ..switchscenes import switch_window_scene
 from . import (
     realtime,
     generator,
@@ -41,8 +46,10 @@ class AUDVIS_PT_audvisNpanel(AudVisButtonsPanel_Npanel):
         box = layout.box()
         box.label(text="Scenes", icon='SCENE_DATA')
         grid = box.grid_flow(row_major=True, columns=3, even_columns=True, even_rows=True, align=True)
+        grid.scale_y = 1.4
         for scene in bpy.data.scenes:
             op = grid.operator("audvis.scene_select", text=scene.name,
+                               icon_value=_scene_icon_id(scene.name),
                                depress=context.window.scene == scene)
             op.scene_name = scene.name
 
@@ -64,6 +71,35 @@ class AUDVIS_PT_audvisNpanel(AudVisButtonsPanel_Npanel):
         col.operator("audvis.forcereload", text="Reload AudVis", icon='FILE_REFRESH')
 
 
+# Color swatch icons for the scene launcher. Blender's UI API can't tint a
+# button or its text, so each button gets a solid-colored icon instead.
+_scene_icons = None
+
+
+def _scene_color(name):
+    # Seeded by the scene name (crc32, not the per-session salted hash()) so a
+    # scene keeps its color across sessions while performing. Saturation and
+    # value also vary so two scenes with similar hues still look different.
+    seed = zlib.crc32(name.encode("utf-8"))
+    hue = (seed & 0xFFFF) / 0xFFFF
+    saturation = 0.6 + 0.4 * (((seed >> 16) & 0xFF) / 0xFF)
+    value = 0.75 + 0.25 * (((seed >> 24) & 0xFF) / 0xFF)
+    return colorsys.hsv_to_rgb(hue, saturation, value)
+
+
+def _scene_icon_id(name):
+    global _scene_icons
+    if _scene_icons is None:
+        _scene_icons = bpy.utils.previews.new()
+    preview = _scene_icons.get(name)
+    if preview is None:
+        preview = _scene_icons.new(name)
+        size = 32
+        preview.icon_size = (size, size)
+        preview.icon_pixels_float = (*_scene_color(name), 1.0) * (size * size)
+    return preview.icon_id
+
+
 class AUDVIS_OT_copyString(bpy.types.Operator):
     bl_idname = "audvis.copy_string"
     bl_label = "Copy to Clipboard"
@@ -80,7 +116,6 @@ class AUDVIS_OT_scene_select(bpy.types.Operator):
 
     bl_idname = "audvis.scene_select"
     bl_label = "Switch Scene"
-    bl_options = {'UNDO'}
 
     scene_name: bpy.props.StringProperty(name="Scene")
 
@@ -89,7 +124,7 @@ class AUDVIS_OT_scene_select(bpy.types.Operator):
         if scene is None:
             self.report({'WARNING'}, "Scene no longer exists")
             return {'CANCELLED'}
-        context.window.scene = scene
+        switch_window_scene(context.window, scene)
         return {'FINISHED'}
 
 
@@ -112,6 +147,10 @@ def register():
 
 
 def unregister():
+    global _scene_icons
+    if _scene_icons is not None:
+        bpy.utils.previews.remove(_scene_icons)
+        _scene_icons = None
     scripttemplates.unregister()
     partymode.unregister()
     spread_drivers.unregister()
