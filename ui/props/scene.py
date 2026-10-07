@@ -175,6 +175,9 @@ class AudvisSceneProperties(bpy.types.PropertyGroup):
     # shape modifier
     shapemodifier_enable: bpy.props.BoolProperty(name="Enable AudVis Shape Modifier")
 
+    # motion fx (cascade, scatter, orbit)
+    motion_enable: bpy.props.BoolProperty(name="Enable AudVis Motion FX", default=False)
+
     # example
     example_channel: bpy.props.IntProperty(name="Sound Channel", default=1, min=1, soft_max=32)
     example_xcount: bpy.props.IntProperty(name="X Count", default=10, min=1, soft_max=500,

@@ -52,6 +52,7 @@ and optionally the packaged extension ZIP after Blender's `--` argument.
 * How to animate things:
     - [Using drivers](doc/drivers.md)
     - [Shape Modifier](doc/shape-modifier.md)
+    - [Motion FX: Cascade, Scatter, Orbit](doc/motion.md)
     - [Generate Armature](doc/armature.md)
     - [Generate Example Objects](doc/example-objects.md)
     - [Scripting](doc/scripting.md)

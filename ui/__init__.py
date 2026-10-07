@@ -15,6 +15,7 @@ from . import (
     values,
     video,
     shapemodifier,
+    motion,
     global_settings,
     drivers_bake,
     spectrogram,
@@ -187,6 +188,7 @@ classes = [
           + partymode.classes \
           + video.classes \
           + shapemodifier.classes \
+          + motion.classes \
           + armature_generator.classes \
           + generator.classes \
           + scripttemplates.classes \
