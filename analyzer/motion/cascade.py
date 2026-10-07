@@ -13,9 +13,9 @@ import math
 import numpy as np
 from mathutils import Euler, Matrix, Vector, geometry
 
-from . import fields, instances
+from . import fields, instances, layer
 from .audio import apply_cc_mods
-from .lib import clamp01, elements, place, scene_time
+from .lib import clamp01, elements, scene_time
 
 MIN_SCALE = 1e-4
 GOLDEN_ANGLE = math.pi * (3 - math.sqrt(5))
@@ -133,6 +133,7 @@ def update(engine, obj, scene, frame):
     mats = matrices(obj.matrix_world, settings, values, mods)
     if not mats:
         return
+    influence = engine.influence(obj, 'cascade', settings, scene)
     field_list = fields.gather(engine, settings.attractors, scene, frame)
     if field_list:
         moved = fields.apply(np.array([m.translation for m in mats]), field_list)
@@ -142,10 +143,11 @@ def update(engine, obj, scene, frame):
     cols = colors(settings, values, t) if settings.use_color else None
     if instanced:
         base = obj.matrix_world
-        arrays = instances.matrices_to_arrays(mats, base.inverted_safe())
-        instances.write(settings.instancer, base, *arrays, colors=cols)
+        pos, axes, angles, scales = instances.matrices_to_arrays(mats, base.inverted_safe())
+        instances.write(settings.instancer, base, pos, axes, angles, scales * influence, colors=cols)
         return
+    layer.sync(engine, obj, 'cascade', copies)
     for i, (copy, matrix) in enumerate(zip(copies, mats)):
-        place(copy, matrix, frame, settings.is_baking)
+        layer.place(obj, 'cascade', copy, matrix, frame, settings.is_baking, influence, scene)
         if cols:
             copy.color = cols[i]

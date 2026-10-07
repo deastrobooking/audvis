@@ -26,6 +26,16 @@ performance tools. The maintainer develops on an Apple-silicon Mac with **Blende
 
 ## Conventions and gotchas
 
+- **Never write the transform of the user's own objects.** Motion FX go through `analyzer/motion/layer.py`:
+  user objects get a Copy Transforms constraint to a hidden helper (collection "AudVis Motion Layer"); only the
+  helper and the constraint influence are written. Objects with `INDEX_KEY` (AudVis-generated copies) are placed
+  directly. Bakes key the helpers, never the user's action. A `frame_change_pre` write to an animated property is
+  overwritten by its f-curve anyway - constraints evaluate after animation, in viewport and final render.
+- Effect strength = `influence` (keyframable, MIDI CC target `influence`) x Engage/Release gate (`engine.gates`,
+  wall-clock, runtime only) x `scene.audvis.motion_master`. Switching an effect off must release its layer
+  (`_on_disable` in `ui/motion.py`).
+- Dynamic enum items (e.g. `CC_TARGETS`) are saved by position - only append.
+
 - Motion FX props get an automatic `update=motion.refresh` via `_refresh_on_change` in `ui/props/motion.py`;
   add internal/state props to its `skip` set.
 - Don't write RNA properties from timers or every frame just for display (it dirties the file and triggers
@@ -45,6 +55,7 @@ All of these must pass before committing (headless, ~1 min total):
 B=/Applications/Blender.app/Contents/MacOS/Blender
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_motion_smoke.py
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_motion_features_smoke.py
+$B --background --factory-startup --python-exit-code 1 --python tests/blender_motion_layer_smoke.py
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_grease_pencil_smoke.py
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_compatibility_smoke.py -- "$(mktemp -d)"
 python3 -m unittest tests.test_blender_compatibility tests.test_grease_pencil_compat

@@ -6,9 +6,9 @@ import math
 import numpy as np
 from mathutils import Matrix
 
-from . import fields, instances
+from . import fields, instances, layer
 from .audio import apply_cc_mods
-from .lib import elements, place, scene_time
+from .lib import elements, scene_time
 
 MIN_SCALE = 1e-4
 GOLDEN_ANGLE = math.pi * (3 - math.sqrt(5))
@@ -121,10 +121,13 @@ def update(engine, center, scene, frame):
     if settings.gravity_mode == 'core':
         scales = scales * np.maximum(MIN_SCALE, 1 - ease)
     axes, angles = rotations(settings, rnd, tangent, t)
+    influence = engine.influence(center, 'orbit', settings, scene)
     if instanced:
-        instances.write(settings.instancer, base, pos, axes, angles, np.repeat(scales[:, None], 3, axis=1))
+        instances.write(settings.instancer, base, pos, axes, angles,
+                        np.repeat(scales[:, None], 3, axis=1) * influence)
         return
+    layer.sync(engine, center, 'orbit', sats)
     for i, sat in enumerate(sats):
         rot = Matrix.Rotation(angles[i], 4, axes[i])
         matrix = base @ Matrix.Translation(pos[i]) @ rot @ Matrix.Scale(scales[i], 4)
-        place(sat, matrix, frame, settings.is_baking)
+        layer.place(center, 'orbit', sat, matrix, frame, settings.is_baking, influence, scene)

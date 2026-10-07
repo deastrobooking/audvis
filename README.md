@@ -51,6 +51,7 @@ Headless smoke tests run inside Blender (all pass in Blender 5.2.2 on Apple sili
 B=/Applications/Blender.app/Contents/MacOS/Blender
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_motion_smoke.py
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_motion_features_smoke.py
+$B --background --factory-startup --python-exit-code 1 --python tests/blender_motion_layer_smoke.py
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_grease_pencil_smoke.py
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_compatibility_smoke.py -- <dependency-dir> [extension-zip]
 python3 -m unittest tests.test_blender_compatibility tests.test_grease_pencil_compat

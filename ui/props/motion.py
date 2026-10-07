@@ -61,12 +61,14 @@ class AudvisMotionAudioProperties(bpy.types.PropertyGroup):
                                      description="How fast values fall back (lower = slower, floatier)")
 
 
-CC_TARGETS = {
+_INFLUENCE = "Fade the whole effect in / out"
+CC_TARGETS = {  # stored by position: only append new targets
     'cascade': [('reveal', "Reveal", ""), ('spread', "Spread", "Multiplies offset / spacing"),
-                ('twist', "Twist", "Multiplies the rotation")],
-    'scatter': [('amount', "Amount", ""), ('morph', "Morph", ""), ('distance', "Distance", "Multiplies distance")],
+                ('twist', "Twist", "Multiplies the rotation"), ('influence', "Influence", _INFLUENCE)],
+    'scatter': [('amount', "Amount", ""), ('morph', "Morph", ""), ('distance', "Distance", "Multiplies distance"),
+                ('influence', "Influence", _INFLUENCE)],
     'orbit': [('gravity', "Gravity", ""), ('radius', "Orbit Radius", "Multiplies the orbit radius"),
-              ('sphere', "Sphere Radius", "Multiplies the gravity sphere radius")],
+              ('sphere', "Sphere Radius", "Multiplies the gravity sphere radius"), ('influence', "Influence", _INFLUENCE)],
     'attractor': [('strength', "Strength", "")],
 }
 
@@ -123,7 +125,11 @@ _OUTPUT_ITEMS = [
 
 
 class AudvisMotionCascadeProperties(bpy.types.PropertyGroup):
-    enable: bpy.props.BoolProperty(name="Enable Cascade", default=False)
+    enable: bpy.props.BoolProperty(name="Enable Cascade", default=False, update=motion.effect_enable_update)
+    influence: bpy.props.FloatProperty(name="Influence", default=1, min=0, max=1, subtype='FACTOR',
+                                       description="How much the effect overrides the objects' own animation."
+                                                   " 0 = they play their keyframes as if AudVis wasn't there."
+                                                   " Keyframe it, or map a MIDI knob")
     is_baking: bpy.props.BoolProperty(default=False)
     output: bpy.props.EnumProperty(name="Output", items=_OUTPUT_ITEMS)
     collection: bpy.props.PointerProperty(name="Copies", type=bpy.types.Collection)
@@ -177,6 +183,10 @@ class AudvisMotionCascadeProperties(bpy.types.PropertyGroup):
 
 class AudvisMotionScatterProperties(bpy.types.PropertyGroup):
     enable: bpy.props.BoolProperty(name="Enable Scatter", default=False, update=motion.scatter_enable_update)
+    influence: bpy.props.FloatProperty(name="Influence", default=1, min=0, max=1, subtype='FACTOR',
+                                       description="How much the effect scatters the mesh."
+                                                   " 0 = assembled shape."
+                                                   " Keyframe it, or map a MIDI knob")
     original_mesh: bpy.props.PointerProperty(name="Original Mesh", type=bpy.types.Mesh)
     prepared_id: bpy.props.IntProperty(default=0)
     prepared_mode: bpy.props.StringProperty(default="")
@@ -240,7 +250,11 @@ class AudvisMotionScatterProperties(bpy.types.PropertyGroup):
 
 
 class AudvisMotionOrbitProperties(bpy.types.PropertyGroup):
-    enable: bpy.props.BoolProperty(name="Enable Orbit", default=False)
+    enable: bpy.props.BoolProperty(name="Enable Orbit", default=False, update=motion.effect_enable_update)
+    influence: bpy.props.FloatProperty(name="Influence", default=1, min=0, max=1, subtype='FACTOR',
+                                       description="How much the effect overrides the objects' own animation."
+                                                   " 0 = they play their keyframes as if AudVis wasn't there."
+                                                   " Keyframe it, or map a MIDI knob")
     is_baking: bpy.props.BoolProperty(default=False)
     output: bpy.props.EnumProperty(name="Output", items=_OUTPUT_ITEMS)
     collection: bpy.props.PointerProperty(name="Satellites", type=bpy.types.Collection,

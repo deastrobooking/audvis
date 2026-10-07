@@ -13,6 +13,29 @@ Every effect has a **Presets** menu at the top - a good way to start:
 | Scatter | Supernova, Disintegrate, Breathing Shards, Galaxy Shards, Bass Core / Treble Skin |
 | Orbit   | Ring Collapse, Swarm, Black Hole, Planets                                 |
 
+## Live control and your own animation
+
+Motion FX never overwrite your objects' own animation. When an effect moves an object of yours (for example, you
+pick your own collection as Orbit's *Satellites*), AudVis adds a *Copy Transforms* constraint named like
+`AudVis Orbit (Center)` that follows a hidden helper in the **AudVis Motion Layer** collection. Your keyframes,
+drivers and transforms stay exactly as they are: the effect only sits on top of them.
+
+- **Influence** (top of every effect) - 1 = the effect takes over, 0 = the objects play their own animation,
+  in between = a crossfade. Keyframe it to hand over at a certain bar, or map a MIDI knob to it
+  (MIDI CC Control > Controls: *Influence*). Copies AudVis generated itself shrink away instead; Scatter
+  pulls the pieces back together.
+- **Engage / Release / Stop** - Release fades the effect out over **Fade Time** and then switches it off,
+  Engage fades it (back) in, Stop cuts immediately. Fades run in real time, also while paused.
+- Unchecking an effect, or Motion FX in the panel header, stops it the same way as Stop.
+- The top of the **Motion FX** panel is a live strip for the whole scene: **Master** (multiplies every
+  Influence), Engage / Release / Stop for everything, and one row per effect with its own Influence and buttons -
+  no need to select objects while performing. Click an effect's name to select its object.
+- **Overriding N objects** shows how many of your objects an effect is moving. The trash button removes the
+  constraints and helpers, leaving the objects exactly as before AudVis touched them.
+
+An object linked into several scenes is overridden in all of them - the constraint lives on the object.
+There's no need to duplicate scenes to protect your animation.
+
 ## Sound settings
 
 All effects (and attractors) share the same **Sound** settings:
@@ -159,7 +182,9 @@ how scattered they are), so the assembled mesh stays intact.
 ## Baking
 
 Cascade and Orbit with *Objects* output can be baked to keyframes (**Bake to Keyframes**) for the scene frame
-range. The live effect is disabled afterwards so the keyframes play. Scatter is a function of Amount and time and
+range. The live effect is disabled afterwards so the keyframes play. AudVis' own copies get the keyframes
+directly; your own objects never do - the bake goes onto their helpers, so their animation stays untouched and
+removing the override layer brings it back. Enabling the live effect again replaces the bake. Scatter is a function of Amount and time and
 doesn't need baking - keyframe *Amount* instead. Instances can't be baked.
 
 ## Scripting

@@ -159,6 +159,7 @@ def unregister():
     partymode.unregister()
     spread_drivers.unregister()
     eq.unregister()
+    motion.unregister()
     realtime.unregister()
     video.unregister()
     del bpy.types.Scene.audvis

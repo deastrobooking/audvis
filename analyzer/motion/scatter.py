@@ -320,9 +320,11 @@ def _ensure_morph(settings, cache, owner_matrix):
                                      cache["area"], settings.seed)
 
 
-def _run(engine, obj, settings, cache, values, t, mods, field_list, write):
+def _run(engine, obj, settings, cache, values, t, mods, field_list, write, influence=1.0):
     _ensure_morph(settings, cache, obj.matrix_world)
     co = compute(settings, cache, values, t, mods, obj.matrix_world, field_list)
+    if co is not None and influence < 1:  # fade towards the assembled shape
+        co = None if influence <= 0 else cache["rest"] + (co - cache["rest"]) * influence
     if co is None:
         if not cache["at_rest"]:
             write(cache["rest"])
@@ -340,13 +342,14 @@ def update(engine, obj, scene, frame):
     apply_cc_mods(engine.cc_reader, settings.cc, mods)
     field_list = fields.gather(engine, settings.attractors, scene, frame)
     t = scene_time(scene, frame)
+    influence = engine.influence(obj, 'scatter', settings, scene)
     if obj.type == 'MESH':
         mesh = obj.data
         if not is_prepared(mesh):
             return
         cache = engine.cached(key, (mesh.name, len(mesh.vertices), settings.seed, settings.prepared_id),
                               lambda: mesh_cache(mesh, settings.seed))
-        _run(engine, obj, settings, cache, values, t, mods, field_list, lambda co: write(mesh, co))
+        _run(engine, obj, settings, cache, values, t, mods, field_list, lambda co: write(mesh, co), influence)
     elif gp_supported(obj):
         for layer in obj.data.layers:
             gp_frame = layer.current_frame()
@@ -356,7 +359,7 @@ def update(engine, obj, scene, frame):
             n = len(drawing.attributes[REST].data)
             cache = engine.cached(key + (layer.name, gp_frame.frame_number),
                                   (n, settings.seed, settings.prepared_id), lambda: gp_cache(drawing, settings.seed))
-            _run(engine, obj, settings, cache, values, t, mods, field_list, lambda co: gp_write(drawing, co))
+            _run(engine, obj, settings, cache, values, t, mods, field_list, lambda co: gp_write(drawing, co), influence)
 
 
 def write(mesh, co):

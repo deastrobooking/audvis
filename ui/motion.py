@@ -4,7 +4,7 @@ import bmesh
 import bpy
 from bpy.types import Operator
 
-from ..analyzer.motion import instances, scatter
+from ..analyzer.motion import instances, layer, scatter
 from ..analyzer.motion.lib import HELPER_KEY, INDEX_KEY
 from . import motion_presets, ui_lib
 from .buttonspanel import AudVisButtonsPanel_Npanel
@@ -32,12 +32,79 @@ def scatter_prepared(obj):
     return scatter.gp_is_prepared(obj)
 
 
+def _effect_name(settings):
+    return settings.path_from_id().rsplit(".", 1)[-1]  # "audvis.orbit" -> "orbit"
+
+
+def _on_disable(settings, context):
+    """An effect was switched off: forget its fade and hand the objects back to their own animation."""
+    obj, effect = settings.id_data, _effect_name(settings)
+    engine = _engine()
+    if engine is not None:
+        engine.gates.pop((obj.name, effect), None)
+    for scene in obj.users_scene:
+        layer.release(scene, obj.name, effect)
+
+
+def effect_enable_update(self, context):
+    if self.enable:
+        engine = _engine()
+        if engine is not None:
+            engine.released.discard((self.id_data.name, _effect_name(self)))
+        refresh(self, context)
+    else:
+        _on_disable(self, context)
+
+
 def scatter_enable_update(self, context):
     obj = self.id_data
     if self.enable:
-        refresh(self, context)
-    elif obj.type in ('MESH', 'GREASEPENCIL'):
+        effect_enable_update(self, context)
+        return
+    _on_disable(self, context)
+    if obj.type in ('MESH', 'GREASEPENCIL'):
         scatter.restore(obj)
+
+
+def motion_enable_update(self, context):
+    """Scene master switch. Off = everything stops and plays its own animation again."""
+    scene = self.id_data
+    if self.motion_enable:
+        refresh(context=context)
+        return
+    engine = _engine()
+    if engine is not None:
+        engine.gates.clear()
+    layer.release(scene)
+    for obj in scene.objects:
+        if obj.audvis.scatter.enable and obj.type in ('MESH', 'GREASEPENCIL'):
+            scatter.restore(obj)
+
+
+def _redraw_ui():
+    for window in bpy.context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type in {'VIEW_3D', 'PROPERTIES'}:
+                area.tag_redraw()
+
+
+def _fade_tick():
+    """Advance Engage / Release fades while the animation is paused (playing frames do it otherwise)."""
+    engine = _engine()
+    if engine is None or not engine.gates:
+        return None
+    try:
+        if not any(w.screen.is_animation_playing for w in bpy.context.window_manager.windows):
+            refresh()
+        _redraw_ui()
+    except Exception:
+        return None
+    return 1 / 30
+
+
+def start_fade_timer():
+    if not bpy.app.timers.is_registered(_fade_tick):
+        bpy.app.timers.register(_fade_tick, first_interval=1 / 30)
 
 
 def orbit_sphere_update(self, context):
@@ -201,8 +268,9 @@ class AUDVIS_OT_motionClear(Operator):
         if obj is None:
             return {'CANCELLED'}
         settings = getattr(obj.audvis, self.effect)
-        remove_generated(settings)
         settings.enable = False
+        layer.remove(context.scene, obj.name, self.effect)
+        remove_generated(settings)
         return {'FINISHED'}
 
 
@@ -386,6 +454,116 @@ class AUDVIS_OT_motionLearnCC(Operator):
         return {'PASS_THROUGH'}
 
 
+def _set_up(obj, effect):
+    """Can this effect run (copies generated / mesh torn apart)?"""
+    settings = getattr(obj.audvis, effect)
+    if effect == 'scatter':
+        return obj.type in ('MESH', 'GREASEPENCIL') and scatter_prepared(obj)
+    return settings.collection is not None or settings.instancer is not None
+
+
+def scene_effects(scene, engine=None):
+    """(object, effect) of every effect that is on, or was switched off by Release / Stop."""
+    released = engine.released if engine is not None else set()
+    for obj in scene.objects:
+        for effect in EFFECTS:
+            if getattr(obj.audvis, effect).enable or (obj.name, effect) in released:
+                yield obj, effect
+
+
+class AUDVIS_OT_motionFade(Operator):
+    bl_idname = "audvis.motion_fade"
+    bl_label = "Engage / Release Motion FX"
+
+    action: bpy.props.EnumProperty(items=[
+        ('engage', "Engage", "Fade in over Fade Time (also brings back released effects)"),
+        ('release', "Release", "Fade out over Fade Time, then switch off - objects play their own animation"),
+        ('stop', "Stop", "Switch off immediately - objects play their own animation"),
+    ])
+    effect: bpy.props.EnumProperty(items=[('all', "All", "")] + [(e, e.title(), "") for e in EFFECTS])
+    object_name: bpy.props.StringProperty(description="Empty = every object in the scene")
+
+    @classmethod
+    def description(cls, context, props):
+        scope = "this effect" if props.object_name else "every effect in the scene"
+        return {
+            'engage': "Fade {} in over Fade Time",
+            'release': "Fade {} out over Fade Time, then switch it off. Objects return to their own animation",
+            'stop': "Switch {} off now. Objects return to their own animation",
+        }[props.action].format(scope)
+
+    def execute(self, context):
+        scene = context.scene
+        engine = _engine()
+        if engine is None:
+            return {'CANCELLED'}
+        if self.object_name:
+            obj = scene.objects.get(self.object_name)
+            effects = EFFECTS if self.effect == 'all' else (self.effect,)
+            targets = [(obj, e) for e in effects if obj is not None]
+        else:
+            targets = [(o, e) for o, e in scene_effects(scene, engine) if self.effect in ('all', e)]
+        seconds = scene.audvis.motion_fade_time
+        for obj, effect in targets:
+            settings = getattr(obj.audvis, effect)
+            key = (obj.name, effect)
+            if self.action == 'engage':
+                if not settings.enable:
+                    if not _set_up(obj, effect):
+                        continue
+                    settings.enable = True
+                    engine.fade(obj.name, effect, 1.0, seconds, start=0.0)
+                else:
+                    engine.fade(obj.name, effect, 1.0, seconds)
+                engine.released.discard(key)
+            elif settings.enable:
+                engine.released.add(key)
+                if self.action == 'stop' or seconds <= 0:
+                    settings.enable = False
+                else:
+                    engine.fade(obj.name, effect, 0.0, seconds)
+        if self.action == 'engage':
+            scene.audvis.motion_enable = True
+        start_fade_timer()
+        refresh(context=context)
+        return {'FINISHED'}
+
+
+class AUDVIS_OT_motionLayerRemove(Operator):
+    """Delete the override constraints and helpers (also baked ones). The objects are exactly as before"""
+    bl_idname = "audvis.motion_layer_remove"
+    bl_label = "Remove Override Layer"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    effect: bpy.props.EnumProperty(items=[('all', "All", "")] + [(e, e.title(), "") for e in EFFECTS])
+    object_name: bpy.props.StringProperty(description="Empty = every object in the scene")
+
+    def execute(self, context):
+        layer.remove(context.scene, self.object_name or None, None if self.effect == 'all' else self.effect)
+        engine = _engine()
+        if engine is not None:
+            engine.layer_members.clear()
+        return {'FINISHED'}
+
+
+class AUDVIS_OT_motionSelect(Operator):
+    """Select this object to edit its effects"""
+    bl_idname = "audvis.motion_select"
+    bl_label = "Select"
+
+    object_name: bpy.props.StringProperty()
+
+    def execute(self, context):
+        obj = context.scene.objects.get(self.object_name)
+        if obj is None:
+            return {'CANCELLED'}
+        for other in context.selected_objects:
+            other.select_set(False)
+        obj.select_set(True)
+        context.view_layer.objects.active = obj
+        return {'FINISHED'}
+
+
 class AUDVIS_OT_motionBake(Operator):
     """Insert keyframes for every frame of the scene, then disable the live effect"""
     bl_idname = "audvis.motion_bake"
@@ -542,6 +720,52 @@ def _draw_bake(layout, settings, effect):
         col.operator("audvis.motion_bake", icon='KEYFRAME').effect = effect
 
 
+EFFECT_ICONS = {'cascade': 'MOD_ARRAY', 'orbit': 'PHYSICS', 'scatter': 'MOD_EXPLODE'}
+
+
+def _fade_buttons(row, obj_name, effect, enabled, fading_out):
+    def button(action, icon, text=""):
+        op = row.operator("audvis.motion_fade", text=text, icon=icon)
+        op.action, op.effect, op.object_name = action, effect, obj_name
+    if enabled and not fading_out:
+        button('release', 'PAUSE')
+    else:
+        button('engage', 'PLAY')
+    button('stop', 'X')
+
+
+def _gate_label(engine, obj_name, effect):
+    state = engine.gate_state(obj_name, effect) if engine is not None else None
+    if state is None or state[0] == state[1]:
+        return None, False
+    value, target = state
+    return ("In" if target > value else "Out") + " {:.0f}%".format(value * 100), target < value
+
+
+def draw_live(layout, context, obj, effect):
+    """Influence + Engage / Release / Stop of one effect, and its override layer."""
+    settings = getattr(obj.audvis, effect)
+    engine = _engine()
+    box = layout.box().column(align=True)
+    row = box.row(align=True)
+    row.prop(settings, "influence", slider=True)
+    label, fading_out = _gate_label(engine, obj.name, effect)
+    if label:
+        row.label(text=label)
+    _fade_buttons(row, obj.name, effect, settings.enable, fading_out)
+    if effect == 'scatter':
+        return
+    overridden = sum(1 for _ in layer.constraints(context.scene, obj.name, effect))
+    if overridden:
+        row = box.row(align=True)
+        row.label(text="Overrides {} of your objects".format(overridden), icon='CONSTRAINT')
+        op = row.operator("audvis.motion_layer_remove", text="", icon='TRASH')
+        op.effect, op.object_name = effect, obj.name
+    if len(obj.users_scene) > 1:
+        box.label(text="Object is in {} scenes - the effect shows in all".format(len(obj.users_scene)),
+                  icon='INFO')
+
+
 # ---------------------------------------------------------------- panels
 
 class AUDVIS_PT_motionNpanel(AudVisButtonsPanel_Npanel):
@@ -555,11 +779,58 @@ class AUDVIS_PT_motionNpanel(AudVisButtonsPanel_Npanel):
         self.layout.prop(context.scene.audvis, "motion_enable", text="")
 
     def draw(self, context):
-        col = self.layout.column(align=True)
-        if not context.scene.audvis.motion_enable:
-            col.label(text="Enable Motion FX in the header", icon='INFO')
+        scene = context.scene
+        props = scene.audvis
+        engine = _engine()
+        layout = self.layout
+        if not props.motion_enable:
+            layout.label(text="Enable Motion FX in the header", icon='INFO')
+
+        # live controls for the whole scene - no need to select objects while performing
+        box = layout.box()
+        col = box.column(align=True)
+        row = col.row(align=True)
+        row.scale_y = 1.4
+        row.prop(props, "motion_master", slider=True)
+        row = col.row(align=True)
+        row.scale_y = 1.4
+        for action, icon, text in (('engage', 'PLAY', "Engage"), ('release', 'PAUSE', "Release"),
+                                   ('stop', 'CANCEL', "Stop")):
+            op = row.operator("audvis.motion_fade", text=text, icon=icon)
+            op.action, op.effect, op.object_name = action, 'all', ""
+        col.prop(props, "motion_fade_time")
+
+        effects = list(scene_effects(scene, engine))
+        if effects:
+            col = box.column(align=True)
+            active = _active(context)
+            for obj, effect in effects:
+                settings = getattr(obj.audvis, effect)
+                row = col.row(align=True)
+                split = row.split(factor=.42, align=True)
+                op = split.operator("audvis.motion_select", text=obj.name, icon=EFFECT_ICONS[effect],
+                                    depress=obj == active)
+                op.object_name = obj.name
+                sub = split.row(align=True)
+                sub.active = settings.enable
+                sub.prop(settings, "influence", text="", slider=True)
+                label, fading_out = _gate_label(engine, obj.name, effect)
+                if label:
+                    sub.label(text=label)
+                _fade_buttons(sub, obj.name, effect, settings.enable, fading_out)
+        else:
+            box.label(text="No effects yet - set one up below", icon='INFO')
+
+        live, baked = layer.summary(scene)
+        if live or baked:
+            row = box.row(align=True)
+            text = "Overriding {} objects".format(live) + (", {} baked".format(baked) if baked else "")
+            row.label(text=text, icon='CONSTRAINT')
+            op = row.operator("audvis.motion_layer_remove", text="", icon='TRASH')
+            op.effect, op.object_name = 'all', ""
+
         obj = _active(context)
-        col.label(text=obj.name if obj else "Select an Object", icon='OBJECT_DATA')
+        layout.label(text=obj.name if obj else "Select an Object", icon='OBJECT_DATA')
 
 
 class _MotionSubpanel(AudVisButtonsPanel_Npanel):
@@ -581,6 +852,7 @@ class AUDVIS_PT_motionCascadeNpanel(_MotionSubpanel):
     def draw(self, context):
         s = _active(context).audvis.cascade
         layout = self.layout
+        draw_live(layout, context, _active(context), 'cascade')
         draw_presets(layout, 'cascade')
         col = layout.column(align=True)
         draw_output(col, s)
@@ -648,6 +920,8 @@ class AUDVIS_PT_motionScatterNpanel(_MotionSubpanel):
         obj = _active(context)
         s = obj.audvis.scatter
         layout = self.layout
+        if scatter_prepared(obj):
+            draw_live(layout, context, obj, 'scatter')
         draw_presets(layout, 'scatter')
         col = layout.column(align=True)
         col.prop(s, "piece_mode")
@@ -713,6 +987,7 @@ class AUDVIS_PT_motionOrbitNpanel(_MotionSubpanel):
     def draw(self, context):
         s = _active(context).audvis.orbit
         layout = self.layout
+        draw_live(layout, context, _active(context), 'orbit')
         draw_presets(layout, 'orbit')
         col = layout.column(align=True)
         col.label(text="Active object is the center")
@@ -800,9 +1075,17 @@ classes = motion_presets.classes + [
     AUDVIS_OT_motionAddAttractor,
     AUDVIS_OT_motionLearnCC,
     AUDVIS_OT_motionBake,
+    AUDVIS_OT_motionFade,
+    AUDVIS_OT_motionLayerRemove,
+    AUDVIS_OT_motionSelect,
     AUDVIS_PT_motionNpanel,
     AUDVIS_PT_motionCascadeNpanel,
     AUDVIS_PT_motionScatterNpanel,
     AUDVIS_PT_motionOrbitNpanel,
     AUDVIS_PT_motionAttractorNpanel,
 ]
+
+
+def unregister():
+    if bpy.app.timers.is_registered(_fade_tick):
+        bpy.app.timers.unregister(_fade_tick)
