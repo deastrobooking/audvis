@@ -248,6 +248,51 @@ try:
             assert bpy.ops.audvis.motion_preset(effect=effect, preset=key) == {'FINISHED'}, (effect, key)
             scene.frame_set(scene.frame_current + 1)
 
+    # --- EQ / macro bands
+    eq_ui = importlib.import_module(ROOT.name + ".ui.eq")
+    calls = []
+
+    def band_driver(low, high, ch=1, **kwargs):
+        calls.append((low, high))
+        return 1.0
+
+    eq_props = NS(source='sound', spread='same', stereo='off', channel=1, freq_start=0, freq_width=10,
+                  freq_step=0, factor=1.0, sound_sequence='', sequence_channel=0, eq_band='3')
+    band3 = scene.audvis.eq_band_3
+    band3.gain = .5
+    assert audio_mod.MotionAudio(engine).raw_values("eq", eq_props, band_driver, 1, scene, 1) == [.5]
+    assert calls[-1] == (150, 400), "uses the band's frequency range"
+    band3.mapped, band3.control = True, 21
+    cc_values[21] = .75
+    assert audio_mod.MotionAudio(engine).raw_values("eq", eq_props, band_driver, 1, scene, 1) == [1.5], \
+        "mapped knob overrides the gain slider (0..2)"
+    del cc_values[21]
+    assert audio_mod.MotionAudio(engine).raw_values("eq", eq_props, band_driver, 1, scene, 1) == [.5], \
+        "unmoved knob falls back to the slider"
+    eq_props.eq_band = 'off'
+    audio_mod.MotionAudio(engine).raw_values("eq", eq_props, band_driver, 1, scene, 1)
+    assert calls[-1] == (0, 10)
+    cube.audvis.cascade.audio.eq_band = '8'  # real RNA enum
+    scene.frame_set(scene.frame_current + 1)
+    assert eq_ui.update_meters() == .1
+
+    # Map / Learn must cancel (not raise) when MIDI Realtime goes away while waiting for a knob
+    scene.audvis.midi_realtime.enable = False
+    fake_ctx = NS(scene=scene, workspace=None, window_manager=NS(windows=[], event_timer_remove=lambda t: None))
+    tick = NS(type='TIMER')
+    op = NS(band=3, _scene_name=scene.name, _started=time.monotonic(), _timer=None, _start_msg=None,
+            report=lambda *a: None, _analyzer=eq_ui.AUDVIS_OT_eqMap._analyzer,
+            _finish=lambda ctx: eq_ui.AUDVIS_OT_eqMap._finish(op, ctx))
+    assert eq_ui.AUDVIS_OT_eqMap.modal(op, fake_ctx, tick) == {'CANCELLED'}
+    ui_motion = importlib.import_module(ROOT.name + ".ui.motion")
+    learn = ui_motion.AUDVIS_OT_motionLearnCC
+    op = NS(effect='cascade', _obj_name=cube.name, _started=time.time(), _timer=None, _start_msg=None,
+            report=lambda *a: None, _analyzer=lambda ctx: learn._analyzer(op, ctx),
+            _finish=lambda ctx, cc: learn._finish(op, ctx, cc))
+    cube.audvis.cascade.cc.is_learning = True
+    assert learn.modal(op, fake_ctx, tick) == {'CANCELLED'}
+    assert not cube.audvis.cascade.cc.is_learning
+
     assert not engine._reported, "an effect raised: %s" % engine._reported
     print("PASS: Motion FX features", bpy.app.version_string)
 finally:

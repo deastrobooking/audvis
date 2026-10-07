@@ -22,6 +22,9 @@ All effects (and attractors) share the same **Sound** settings:
     - **Same for All** - one frequency range for everything
     - **Frequency Bands** - element *i* uses `Frequency Start + i * Frequency Step` (or `MIDI Note + i`)
     - **Time Delay** - element *i* gets the value from *i × Delay* frames ago - a wave travels through
+- **EQ Band** - instead of Frequency Start / Range, use one of the eight bands of the
+  [EQ / Macros](#eq--macros) panel; its Gain slider (or mapped MIDI knob) then scales this effect live.
+  With Frequency Bands, Frequency Step still offsets each element from the band
 - **Sensitivity** - multiplies the analyzer value. The effects expect values around 0..1
 - **Response**
     - **Follow** - follow the loudness, smoothed by **Attack / Release**. Low Release = things float back slowly
@@ -48,6 +51,17 @@ controller (MIDI Realtime must be enabled). **Controls** picks the value:
 
 **Mode**: *Replace* (knob sets Min..Max), *Add* or *Multiply*. The knob is read directly, it isn't affected by
 the global Driver Value settings.
+
+## EQ / Macros
+
+The **EQ / Macros** panel has eight shared frequency bands (20–60, 60–150, 150–400, 400–1k, 1k–2.5k,
+2.5k–6k, 6k–12k and 12k–20k Hz), each with a live level meter and a **Gain** slider (0–2). In any Sound section,
+set **EQ Band** to make that effect use the band's frequency range and multiply its sound by the band's gain.
+Several effects can share one band, so a single slider rides all of them.
+
+**Map** under a slider assigns a MIDI knob or fader (MIDI Realtime must be enabled; Esc cancels). The knob
+then sets the gain from 0 to 2, and **×** clears the mapping. The window button next to **Meter Sound Channel**
+opens the panel in its own window, for a second screen while performing.
 
 ## Cascade
 

@@ -16,6 +16,7 @@ from . import (
     video,
     shapemodifier,
     motion,
+    eq,
     global_settings,
     drivers_bake,
     spectrogram,
@@ -131,12 +132,14 @@ class AUDVIS_OT_scene_select(bpy.types.Operator):
 
 class AudvisWindowProperties(bpy.types.PropertyGroup):
     ispartymode: bpy.props.BoolProperty(name="Is Party Mode Window", default=False)
+    iseq: bpy.props.BoolProperty(name="Is EQ Window", default=False)
 
 
 def register():
     scripttemplates.register()
     partymode.register()
     spread_drivers.register()
+    eq.register()
     bpy.types.Scene.audvis = bpy.props.PointerProperty(type=props.scene.AudvisSceneProperties)
     bpy.types.Object.audvis = bpy.props.PointerProperty(type=props.obj.AudvisObjectProperties)
     if hasattr(bpy.types, "SoundSequence"):
@@ -155,6 +158,7 @@ def unregister():
     scripttemplates.unregister()
     partymode.unregister()
     spread_drivers.unregister()
+    eq.unregister()
     realtime.unregister()
     video.unregister()
     del bpy.types.Scene.audvis
@@ -189,6 +193,7 @@ classes = [
           + video.classes \
           + shapemodifier.classes \
           + motion.classes \
+          + eq.classes \
           + armature_generator.classes \
           + generator.classes \
           + scripttemplates.classes \

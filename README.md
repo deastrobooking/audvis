@@ -1,6 +1,6 @@
 # Blender AudVis
 
-AudVis is a Blender 2.8 and higher add-on helping you to build awesome audio visualizations. The main features are Real
+AudVis is a Blender 4.2 and higher add-on (extension) helping you to build awesome audio visualizations. The main features are Real
 Time Analyzer and Sequence Analyzer.
 
 ## Important links:
@@ -32,12 +32,29 @@ wheels. Official Blender 5.2 Mac builds require Apple silicon and macOS 13+
 The Python 3.11 packages are restricted to Blender versions before 5.1.
 
 The 5.2 update covers slotted action curves, MIDI baking, sequencer strips,
-and compositor driver discovery. Grease Pencil smoke tests passed in Blender
-5.2.2. Full extension verification is incomplete: the test Mac runs macOS
-12.7.6, where Blender's bundled NumPy fails to load an Accelerate symbol.
-The broader test can be run on a supported Mac using
-`tests/blender_compatibility_smoke.py`; it requires the dependency directory
-and optionally the packaged extension ZIP after Blender's `--` argument.
+and compositor driver discovery.
+
+To install a fresh build into your local Blender 5.2 for testing (replaces the
+installed AudVis; restart Blender afterwards):
+
+```sh
+python3 build-macos.py --blender-version 5.2 --skip-download
+/Applications/Blender.app/Contents/MacOS/Blender --command extension install-file \
+    -r user_default dist/audvis-8.0.1-blender5.2-macos-arm64.zip
+```
+
+## Tests
+
+Headless smoke tests run inside Blender (all pass in Blender 5.2.2 on Apple silicon):
+
+```sh
+B=/Applications/Blender.app/Contents/MacOS/Blender
+$B --background --factory-startup --python-exit-code 1 --python tests/blender_motion_smoke.py
+$B --background --factory-startup --python-exit-code 1 --python tests/blender_motion_features_smoke.py
+$B --background --factory-startup --python-exit-code 1 --python tests/blender_grease_pencil_smoke.py
+$B --background --factory-startup --python-exit-code 1 --python tests/blender_compatibility_smoke.py -- <dependency-dir> [extension-zip]
+python3 -m unittest tests.test_blender_compatibility tests.test_grease_pencil_compat
+```
 
 ## Documentation:
 
@@ -53,6 +70,7 @@ and optionally the packaged extension ZIP after Blender's `--` argument.
     - [Using drivers](doc/drivers.md)
     - [Shape Modifier](doc/shape-modifier.md)
     - [Motion FX: Cascade, Scatter, Orbit](doc/motion.md)
+    - [EQ / Macros: shared band gains, MIDI-mappable](doc/motion.md#eq--macros)
     - [Generate Armature](doc/armature.md)
     - [Generate Example Objects](doc/example-objects.md)
     - [Scripting](doc/scripting.md)

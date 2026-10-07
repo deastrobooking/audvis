@@ -25,8 +25,29 @@ def _band(props, local):
     return low, low + props.freq_width
 
 
-def sample(props, driver, ch, local):
-    """Raw value for one channel / band, already multiplied by props.factor."""
+EQ_EDGES = (20, 60, 150, 400, 1000, 2500, 6000, 12000, 20000)  # Hz, 8 shared EQ / macro bands
+
+
+def eq_gain(band, cc_reader):
+    """Gain (0..2) of an EQ band. A mapped MIDI knob overrides the slider once it has been moved."""
+    if band.mapped and cc_reader is not None:
+        cc = cc_reader(band.control, band.channel)
+        if cc is not None:
+            return cc * 2.0
+    return band.gain
+
+
+def eq_band(props, scene, cc_reader):
+    """(low Hz, high Hz, gain) of the EQ band the sound settings opted into, or None."""
+    index = getattr(props, 'eq_band', 'off')
+    if index == 'off' or props.source != 'sound':
+        return None
+    i = int(index)
+    return EQ_EDGES[i - 1], EQ_EDGES[i], eq_gain(getattr(scene.audvis, 'eq_band_%d' % i), cc_reader)
+
+
+def sample(props, driver, ch, local, eq=None):
+    """Raw value for one channel / band, already multiplied by props.factor (and the EQ band gain)."""
     if props.source == 'off':
         return 0.0
     if props.source == 'midi':
@@ -42,8 +63,12 @@ def sample(props, driver, ch, local):
             kwargs['seq'] = props.sound_sequence
         if props.sequence_channel > 0:
             kwargs['seq_channel'] = props.sequence_channel
-        low, high = _band(props, local)
-        val = driver(low, high, ch=ch, **kwargs)
+        if eq is None:
+            low, high = _band(props, local)
+        else:
+            low = eq[0] + (local * props.freq_step if props.spread == 'bands' else 0)
+            high = low + eq[1] - eq[0]
+        val = driver(low, high, ch=ch, **kwargs) * (1.0 if eq is None else eq[2])
     return val * props.factor
 
 
@@ -63,7 +88,8 @@ def _consecutive(last_frame, frame):
 
 
 class MotionAudio:
-    def __init__(self):
+    def __init__(self, owner=None):
+        self.owner = owner  # MotionEngine: its cc_reader drives MIDI-mapped EQ band gains
         self._states = {}  # (kind, key) -> (frame, state before frame, state after frame)
         self._history = {}  # key -> {frame: {channel: value}}
 
@@ -90,10 +116,11 @@ class MotionAudio:
 
     def raw_values(self, key, props, driver, count, scene, frame):
         layout = [channel_layout(props, i, count) for i in range(count)]
+        eq = eq_band(props, scene, getattr(self.owner, 'cc_reader', None))
         if props.spread != 'delay':
-            return [sample(props, driver, ch, local) for ch, local, _ in layout]
+            return [sample(props, driver, ch, local, eq) for ch, local, _ in layout]
         history = self._history.setdefault(key, {})
-        current = {ch: sample(props, driver, ch, 0) for ch in set(ch for ch, _, _ in layout)}
+        current = {ch: sample(props, driver, ch, 0, eq) for ch in set(ch for ch, _, _ in layout)}
         history[frame] = current
         window = count * props.delay + 2
         if len(history) > window * 4 + 100:

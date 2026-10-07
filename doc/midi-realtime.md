@@ -18,3 +18,10 @@ You can combine parameters, but combining midi=30 (note) and midi_control=83 (co
 - **Restart Midi Inputs**: restarts the backend. Use when in trouble
 - **Debug Realtime Midi Messages**: write last midi note / midi control message in the workspace status text (left
   bottom corner)
+
+## MIDI Learn
+
+You don't need to look up CC numbers. With MIDI Realtime enabled, click **Learn** in a Motion FX
+[MIDI CC Control](./motion.md#live-controls-midi-cc) box, or **Map** under an
+[EQ / Macros](./motion.md#eq--macros) gain slider, then move a knob or fader. Esc cancels; after 15 seconds
+without a message it cancels by itself, and it also cancels if MIDI Realtime is switched off while waiting.

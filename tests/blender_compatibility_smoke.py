@@ -27,7 +27,12 @@ with tempfile.TemporaryDirectory(prefix="audvis-smoke-") as temporary:
     preferences.module = "audvis"
     audvis.register()
     try:
-        unregistered = [cls.__name__ for cls in audvis.classes if not cls.is_registered]
+        # Gizmo / GizmoGroup have no is_registered; registering sets bl_rna on every class
+        # UPBGE-only panels (Logic Editor) can't register in regular Blender
+        spaces = bpy.types.Space.bl_rna.properties["type"].enum_items.keys()
+        unregistered = [cls.__name__ for cls in audvis.classes
+                        if not getattr(cls, "is_registered", "bl_rna" in cls.__dict__)
+                        and getattr(cls, "bl_space_type", "VIEW_3D") in spaces]
         assert not unregistered, unregistered
         for name in ["cffi", "pygame", "sounddevice", "soundfile", "mido", "cv2"]:
             importlib.import_module(name)

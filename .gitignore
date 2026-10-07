@@ -5,3 +5,4 @@ venv/
 blender_autocomplete/
 wheels/
 dist/
+.DS_Store

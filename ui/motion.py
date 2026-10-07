@@ -336,6 +336,8 @@ class AUDVIS_OT_motionLearnCC(Operator):
         return _active(context) is not None and context.scene.audvis.midi_realtime.enable
 
     def _analyzer(self, context):
+        if not context.scene.audvis.midi_realtime.enable:
+            return None
         return bpy.audvis.get_midi_realtime_analyzer(context.scene)
 
     def invoke(self, context, event):
@@ -354,8 +356,9 @@ class AUDVIS_OT_motionLearnCC(Operator):
     def _finish(self, context, cc):
         cc.is_learning = False
         context.window_manager.event_timer_remove(self._timer)
-        for area in context.screen.areas:
-            area.tag_redraw()
+        for window in context.window_manager.windows:
+            for area in window.screen.areas:
+                area.tag_redraw()
 
     def modal(self, context, event):
         obj = bpy.data.objects.get(self._obj_name)
@@ -367,7 +370,12 @@ class AUDVIS_OT_motionLearnCC(Operator):
             self._finish(context, cc)
             return {'CANCELLED'}
         if event.type == 'TIMER':
-            msg = self._analyzer(context).get_last_msg()
+            analyzer = self._analyzer(context)
+            if analyzer is None:  # MIDI Realtime switched off / AudVis reloaded while waiting
+                self.report({'WARNING'}, "MIDI Realtime stopped - learn cancelled")
+                self._finish(context, cc)
+                return {'CANCELLED'}
+            msg = analyzer.get_last_msg()
             if msg is not None and msg is not self._start_msg and hasattr(msg, "control"):
                 cc.control = msg.control
                 cc.channel = msg.channel
@@ -457,8 +465,10 @@ def draw_audio(layout, context, props, spread=True):
     if props.source == 'midi':
         box.prop(props, "midi_note")
     else:
-        box.prop(props, "freq_start")
-        box.prop(props, "freq_width")
+        box.prop(props, "eq_band")
+        if props.eq_band == 'off':
+            box.prop(props, "freq_start")
+            box.prop(props, "freq_width")
         if spread and props.spread == 'bands':
             box.prop(props, "freq_step")
     box.prop(props, "factor")

@@ -10,7 +10,7 @@ class MotionEngine:
     def __init__(self, driver, cc_reader=None):
         self.driver = driver
         self.cc_reader = cc_reader  # (control, channel) -> 0..1 or None
-        self.audio = MotionAudio()
+        self.audio = MotionAudio(self)
         self._cache = {}
         self._reported = set()
 

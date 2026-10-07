@@ -117,6 +117,9 @@ Party Mode adds a temporary `audvis-party` workspace and deletes it again on exi
 - Keep the sidebar (**N**) open on the AudVis tab of your control screen to adjust Driver Values (multiplier, noise,
   fade-out) during the set. See [Driver Values](./driver-values.md).
 - Use **MIDI Realtime** to drive values from a controller's knobs and pads. See [MIDI Realtime](./midi-realtime.md).
+- Ride the Motion FX with the **EQ / Macros** panel: eight band gain sliders, each mappable to a knob or fader with
+  **Map**. Open it in its own window (the window button in the panel) and put it on your control screen. See
+  [EQ / Macros](./motion.md#eq--macros).
 - If the audio input stops responding, click **Reconnect and reload device list**, or toggle the Real Time Analyzer checkbox off and on. If that doesn't help,
   click **Reload AudVis** at the bottom of the main AudVis panel.
 

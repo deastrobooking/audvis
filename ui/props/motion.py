@@ -4,6 +4,7 @@ import bpy
 
 from .midi import AudvisMidiGeneratorsProperties
 from .. import motion
+from ...analyzer.motion.audio import EQ_EDGES
 
 
 class AudvisMotionAudioProperties(bpy.types.PropertyGroup):
@@ -37,6 +38,10 @@ class AudvisMotionAudioProperties(bpy.types.PropertyGroup):
     ])
     cooldown: bpy.props.IntProperty(name="Cooldown (frames)", default=6, min=0, soft_max=100,
                                     description="Minimum frames between two triggers")
+    eq_band: bpy.props.EnumProperty(name="EQ Band", default='off', items=[
+        ('off', "Off", "Use Frequency Start / Range below"),
+    ] + [(str(i), "Band {} ({:g}-{:g} Hz)".format(i, EQ_EDGES[i - 1], EQ_EDGES[i]),
+          "Use this band's frequency range and its gain from the EQ / Macros panel") for i in range(1, 9)])
     freq_start: bpy.props.FloatProperty(name="Frequency Start", default=20, min=0)
     freq_width: bpy.props.FloatProperty(name="Frequency Range", default=150, min=.01)
     freq_step: bpy.props.FloatProperty(name="Frequency Step", default=100, min=0,
