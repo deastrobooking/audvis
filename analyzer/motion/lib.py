@@ -1,4 +1,5 @@
 INDEX_KEY = "audvis_motion_index"
+HELPER_KEY = "audvis_motion_helper"  # instancer carriers, hidden instance sources
 
 
 def clamp01(x):
@@ -20,7 +21,7 @@ def elements(collection, exclude=None):
     """Objects of a generated / chosen collection in a stable order."""
     if collection is None:
         return []
-    objs = [obj for obj in collection.objects if obj != exclude]
+    objs = [obj for obj in collection.objects if obj != exclude and HELPER_KEY not in obj]
     objs.sort(key=lambda o: (o.get(INDEX_KEY, 1 << 30), o.name))
     return objs
 

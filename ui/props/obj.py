@@ -13,3 +13,4 @@ class AudvisObjectProperties(bpy.types.PropertyGroup):
     cascade: bpy.props.PointerProperty(type=motion.AudvisMotionCascadeProperties)
     scatter: bpy.props.PointerProperty(type=motion.AudvisMotionScatterProperties)
     orbit: bpy.props.PointerProperty(type=motion.AudvisMotionOrbitProperties)
+    attractor: bpy.props.PointerProperty(type=motion.AudvisMotionAttractorProperties)

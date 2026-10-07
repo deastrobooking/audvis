@@ -139,6 +139,7 @@ try:
     bpy.ops.audvis.motion_scatter_remove()
     assert "audvis_rest" not in ico.data.attributes and s.original_mesh is None
 
+    assert not engine._reported, "an effect raised: %s" % engine._reported
     print("PASS: Motion FX cascade, bake, orbit gravity, scatter", bpy.app.version_string)
 finally:
     audvis.unregister()

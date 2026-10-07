@@ -266,8 +266,25 @@ class AudVis:
 
     def _get_motion_engine(self):
         if self.motion_engine is None:
-            self.motion_engine = MotionEngine(self.driver)
+            self.motion_engine = MotionEngine(self.driver, self.midi_cc)
         return self.motion_engine
+
+    def midi_cc(self, control, channel=-1):
+        """Last value (0..1) of a MIDI CC from the realtime MIDI input, None if not received yet.
+        Read directly, so Motion FX live controls aren't scaled by the driver value settings."""
+        analyzer = self.midi_realtime_analyzer
+        if analyzer is None or not bpy.context.scene.audvis.midi_realtime.enable:
+            return None
+        data = analyzer._last_data_controls
+        if not data:
+            return None
+        for device in list(data.values()):
+            for ch, controls in list(device.items()):
+                if channel >= 0 and ch != channel:
+                    continue
+                if control in controls:
+                    return controls[control] / 127
+        return None
 
     def _get_spectrogram_generator(self):
         if self.spectrogram_generator is None:

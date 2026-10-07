@@ -17,6 +17,26 @@ class AudvisMotionAudioProperties(bpy.types.PropertyGroup):
         ('bands', "Frequency Bands", "Each element gets its own frequency range (or MIDI note)"),
         ('delay', "Time Delay", "Each element reacts later than the previous one - a wave travels through"),
     ])
+    stereo: bpy.props.EnumProperty(name="Stereo", default='off', items=[
+        ('off', "Off", "Use the Sound Channel only"),
+        ('split', "Left / Right Halves", "First half of the elements follows Sound Channel (left), the second"
+                                         " half the next channel (right). Scatter: pieces on -X / +X side"),
+        ('alternate', "Alternate", "Every other element follows the right channel"),
+    ], description="Needs Channels Count 2+ in the main AudVis panel")
+    response: bpy.props.EnumProperty(name="Response", default='follow', items=[
+        ('follow', "Follow", "Follow the loudness (smoothed by Attack / Release)"),
+        ('trigger', "Beat Trigger", "Fire a one-shot envelope (0..1) when the sound crosses the Threshold"),
+    ])
+    threshold: bpy.props.FloatProperty(name="Threshold", default=.5, min=0, soft_max=5,
+                                       description="Value (after Sensitivity) that fires a trigger")
+    trigger_length: bpy.props.IntProperty(name="Length (frames)", default=24, min=1, soft_max=250)
+    trigger_shape: bpy.props.EnumProperty(name="Shape", default='decay', items=[
+        ('decay', "Hit & Decay", "Jump to 1, fade out"),
+        ('pulse', "Pulse", "Rise and fall back (smooth there-and-back)"),
+        ('hold', "Hold", "Stay at 1, drop at the end"),
+    ])
+    cooldown: bpy.props.IntProperty(name="Cooldown (frames)", default=6, min=0, soft_max=100,
+                                    description="Minimum frames between two triggers")
     freq_start: bpy.props.FloatProperty(name="Frequency Start", default=20, min=0)
     freq_width: bpy.props.FloatProperty(name="Frequency Range", default=150, min=.01)
     freq_step: bpy.props.FloatProperty(name="Frequency Step", default=100, min=0,
@@ -36,13 +56,89 @@ class AudvisMotionAudioProperties(bpy.types.PropertyGroup):
                                      description="How fast values fall back (lower = slower, floatier)")
 
 
+CC_TARGETS = {
+    'cascade': [('reveal', "Reveal", ""), ('spread', "Spread", "Multiplies offset / spacing"),
+                ('twist', "Twist", "Multiplies the rotation")],
+    'scatter': [('amount', "Amount", ""), ('morph', "Morph", ""), ('distance', "Distance", "Multiplies distance")],
+    'orbit': [('gravity', "Gravity", ""), ('radius', "Orbit Radius", "Multiplies the orbit radius"),
+              ('sphere', "Sphere Radius", "Multiplies the gravity sphere radius")],
+    'attractor': [('strength', "Strength", "")],
+}
+
+
+def cc_target_items(self, context):
+    path = self.path_from_id()
+    for key, items in CC_TARGETS.items():
+        if ".{}.".format(key) in path:
+            return items
+    return [('none', "None", "")]
+
+
+class AudvisMotionCCProperties(bpy.types.PropertyGroup):
+    enable: bpy.props.BoolProperty(name="MIDI CC Control", default=False,
+                                   description="Control a value live by a MIDI controller knob / fader."
+                                               " Needs MIDI Realtime enabled")
+    target: bpy.props.EnumProperty(name="Controls", items=cc_target_items)
+    control: bpy.props.IntProperty(name="CC Number", default=1, min=0, max=127)
+    channel: bpy.props.IntProperty(name="MIDI Channel", default=-1, min=-1, max=16, description="-1 = any")
+    mode: bpy.props.EnumProperty(name="Mode", default='replace', items=[
+        ('replace', "Replace", "The knob sets the value: Min .. Max"),
+        ('add', "Add", "The knob adds Min .. Max"),
+        ('multiply', "Multiply", "The knob multiplies by Min .. Max"),
+    ])
+    range_min: bpy.props.FloatProperty(name="Min", default=0)
+    range_max: bpy.props.FloatProperty(name="Max", default=1)
+    is_learning: bpy.props.BoolProperty(default=False)
+
+
+class AudvisMotionAttractorProperties(bpy.types.PropertyGroup):
+    mode: bpy.props.EnumProperty(name="Mode", default='attract', items=[
+        ('attract', "Attract", "Pull onto a sphere around this object"),
+        ('repel', "Repel", "Push away"),
+        ('vortex', "Vortex", "Swirl around this object's Z axis"),
+    ])
+    strength: bpy.props.FloatProperty(name="Strength", default=1, soft_min=0, soft_max=1,
+                                      description="Keyframe it. Attract: 1 = fully on the sphere")
+    sphere_radius: bpy.props.FloatProperty(name="Sphere Radius", default=1, min=0, subtype='DISTANCE')
+    distance: bpy.props.FloatProperty(name="Push Distance", default=2, soft_min=0, soft_max=20, subtype='DISTANCE')
+    twist: bpy.props.FloatProperty(name="Twist (turns)", default=.25, soft_min=-2, soft_max=2)
+    influence: bpy.props.FloatProperty(name="Influence Radius", default=0, min=0, subtype='DISTANCE',
+                                       description="Full effect inside, fading out until twice the radius."
+                                                   " 0 = everywhere")
+    audio: bpy.props.PointerProperty(type=AudvisMotionAudioProperties)
+    audio_strength: bpy.props.FloatProperty(name="Sound → Strength", default=1, soft_min=-2, soft_max=2)
+    cc: bpy.props.PointerProperty(type=AudvisMotionCCProperties)
+
+
+_OUTPUT_ITEMS = [
+    ('objects', "Objects", "Separate objects - can be edited, baked, have their own materials"),
+    ('instances', "Instances (fast)", "Geometry Nodes instances on one point cloud object. For thousands of"
+                                      " elements"),
+]
+
+
 class AudvisMotionCascadeProperties(bpy.types.PropertyGroup):
     enable: bpy.props.BoolProperty(name="Enable Cascade", default=False)
     is_baking: bpy.props.BoolProperty(default=False)
+    output: bpy.props.EnumProperty(name="Output", items=_OUTPUT_ITEMS)
     collection: bpy.props.PointerProperty(name="Copies", type=bpy.types.Collection)
+    instancer: bpy.props.PointerProperty(name="Instancer", type=bpy.types.Object)
     count: bpy.props.IntProperty(name="Copies", default=12, min=1, soft_max=200)
     linked: bpy.props.BoolProperty(name="Linked Data", default=True,
                                    description="Copies share the mesh/curve data with the source")
+    layout: bpy.props.EnumProperty(name="Layout", default='chain', items=[
+        ('chain', "Chain", "Each copy steps from the previous one - spirals, helixes, tunnels"),
+        ('phyllotaxis', "Phyllotaxis", "Sunflower spiral (golden angle). Offset Z raises it into a cone"),
+        ('grid', "Grid", "Columns x rows x layers"),
+        ('curve', "Along Curve", "Spread along the first spline of a curve object"),
+    ])
+    spacing: bpy.props.FloatProperty(name="Spacing", default=.5, soft_min=0, soft_max=10, subtype='DISTANCE')
+    grid_columns: bpy.props.IntProperty(name="Columns", default=8, min=1)
+    grid_rows: bpy.props.IntProperty(name="Rows", default=8, min=1)
+    curve_object: bpy.props.PointerProperty(name="Curve", type=bpy.types.Object,
+                                            poll=lambda self, obj: obj.type == 'CURVE')
+    curve_offset: bpy.props.FloatProperty(name="Curve Offset", default=0, soft_min=-1, soft_max=1,
+                                          description="Slide along the curve. Keyframe it to make the copies flow")
     offset: bpy.props.FloatVectorProperty(name="Offset", default=(0, 0, .5), subtype='TRANSLATION',
                                           description="Each copy moves this much from the previous one")
     rotation: bpy.props.FloatVectorProperty(name="Rotation", default=(0, 0, math.radians(15)),
@@ -51,7 +147,7 @@ class AudvisMotionCascadeProperties(bpy.types.PropertyGroup):
                                               subtype='XYZ', description="Multiplied for each copy")
     audio: bpy.props.PointerProperty(type=AudvisMotionAudioProperties)
     audio_offset: bpy.props.FloatProperty(name="Sound → Offset", default=1, soft_min=-5, soft_max=5,
-                                          description="Sound stretches the offset step")
+                                          description="Sound stretches the offset step / spacing")
     audio_rotation: bpy.props.FloatProperty(name="Sound → Rotation", default=0, soft_min=-5, soft_max=5,
                                             description="Sound twists the rotation step")
     audio_scale: bpy.props.FloatProperty(name="Sound → Pulse", default=0, soft_min=-2, soft_max=5,
@@ -62,13 +158,16 @@ class AudvisMotionCascadeProperties(bpy.types.PropertyGroup):
                                           description="Sound of the first copy adds to Reveal")
     use_color: bpy.props.BoolProperty(name="Color Gradient", default=False,
                                       description="Set Object Color of the copies (Object Info > Color in shaders,"
-                                                  " Viewport Shading > Color > Object)")
+                                                  " Viewport Shading > Color > Object). Instances: attribute"
+                                                  " 'audvis_color' (Attribute node, type Instancer)")
     hue: bpy.props.FloatProperty(name="Hue", default=0, min=0, max=1, subtype='FACTOR')
     hue_step: bpy.props.FloatProperty(name="Hue Step", default=.04, soft_min=-.2, soft_max=.2)
     hue_speed: bpy.props.FloatProperty(name="Hue Cycle Speed", default=0, soft_min=-1, soft_max=1,
                                        description="Hue rotations per second")
     saturation: bpy.props.FloatProperty(name="Saturation", default=.8, min=0, max=1, subtype='FACTOR')
     audio_hue: bpy.props.FloatProperty(name="Sound → Hue", default=0, soft_min=-1, soft_max=1)
+    attractors: bpy.props.PointerProperty(name="Attractors", type=bpy.types.Collection)
+    cc: bpy.props.PointerProperty(type=AudvisMotionCCProperties)
 
 
 class AudvisMotionScatterProperties(bpy.types.PropertyGroup):
@@ -77,9 +176,9 @@ class AudvisMotionScatterProperties(bpy.types.PropertyGroup):
     prepared_id: bpy.props.IntProperty(default=0)
     prepared_mode: bpy.props.StringProperty(default="")
     piece_mode: bpy.props.EnumProperty(name="Tear Into", default='faces', items=[
-        ('faces', "Faces", "Every face becomes a separate shard"),
-        ('islands', "Loose Parts", "Every loose part (mesh island) moves as one piece"),
-        ('vertices', "Vertices", "Every vertex moves alone - faces stretch like a web"),
+        ('faces', "Faces", "Every face becomes a separate shard (Grease Pencil: every stroke)"),
+        ('islands', "Loose Parts", "Every loose part (mesh island) moves as one piece (Grease Pencil: stroke)"),
+        ('vertices', "Vertices", "Every vertex / point moves alone - faces and strokes stretch like a web"),
     ])
     seed: bpy.props.IntProperty(name="Seed", default=1)
     amount: bpy.props.FloatProperty(name="Amount", default=0, min=0, max=1, subtype='FACTOR',
@@ -107,6 +206,11 @@ class AudvisMotionScatterProperties(bpy.types.PropertyGroup):
     turbulence: bpy.props.FloatProperty(name="Turbulence", default=0, min=0, soft_max=2, subtype='DISTANCE',
                                         description="Pieces float around while scattered")
     turbulence_speed: bpy.props.FloatProperty(name="Turbulence Speed", default=.5, min=0, soft_max=4)
+    orbit_speed: bpy.props.FloatProperty(name="Orbit Speed", default=0, soft_min=-1, soft_max=1,
+                                         description="Scattered pieces circle the object's origin (turns per"
+                                                     " second). Amount 0 still snaps them back together")
+    orbit_tilt: bpy.props.FloatProperty(name="Orbit Tilt", default=.2, min=0, soft_max=3,
+                                        description="0 = flat ring around Z, higher = tilted orbits, swarm")
     stagger: bpy.props.FloatProperty(name="Stagger", default=0, min=0, soft_max=4,
                                      description="Pieces leave one after another instead of all together")
     stagger_mode: bpy.props.EnumProperty(name="Stagger Order", default='distance', items=[
@@ -115,13 +219,28 @@ class AudvisMotionScatterProperties(bpy.types.PropertyGroup):
         ('random', "Random", ""),
     ])
     stagger_invert: bpy.props.BoolProperty(name="Invert Order", default=False)
+    morph_target: bpy.props.PointerProperty(name="Morph Target", type=bpy.types.Object,
+                                            poll=lambda self, obj: obj.type == 'MESH' and obj != self.id_data,
+                                            description="Mesh whose shape the pieces rebuild at Morph 1")
+    morph: bpy.props.FloatProperty(name="Morph", default=0, min=0, max=1, subtype='FACTOR',
+                                   description="0 = own shape, 1 = shape of the Morph Target. Keyframe it")
+    audio_morph: bpy.props.FloatProperty(name="Sound → Morph", default=0, soft_min=-2, soft_max=2)
+    morph_scatter: bpy.props.FloatProperty(name="Fly While Morphing", default=.5, min=0, max=1, subtype='FACTOR',
+                                           description="How far the pieces scatter on their way to the target")
+    morph_scale: bpy.props.FloatProperty(name="Piece Size at Target", default=1, min=.01, soft_max=3,
+                                         description="Pieces are scaled to cover the target's area; tweak here")
+    attractors: bpy.props.PointerProperty(name="Attractors", type=bpy.types.Collection,
+                                          description="Attractors move only loose pieces")
+    cc: bpy.props.PointerProperty(type=AudvisMotionCCProperties)
 
 
 class AudvisMotionOrbitProperties(bpy.types.PropertyGroup):
     enable: bpy.props.BoolProperty(name="Enable Orbit", default=False)
     is_baking: bpy.props.BoolProperty(default=False)
+    output: bpy.props.EnumProperty(name="Output", items=_OUTPUT_ITEMS)
     collection: bpy.props.PointerProperty(name="Satellites", type=bpy.types.Collection,
                                           description="Objects orbiting this object")
+    instancer: bpy.props.PointerProperty(name="Instancer", type=bpy.types.Object)
     source_object: bpy.props.PointerProperty(name="Satellite Object", type=bpy.types.Object,
                                              description="Copied by Populate. Empty = small ico spheres")
     count: bpy.props.IntProperty(name="Count", default=40, min=1, soft_max=2000)
@@ -163,12 +282,14 @@ class AudvisMotionOrbitProperties(bpy.types.PropertyGroup):
                                              description="Outer satellites arrive later")
     shell_spin: bpy.props.FloatProperty(name="Shell Spin", default=.05, soft_min=-1, soft_max=1,
                                         description="Turns per second of the sphere shell")
+    attractors: bpy.props.PointerProperty(name="Attractors", type=bpy.types.Collection)
+    cc: bpy.props.PointerProperty(type=AudvisMotionCCProperties)
 
 
 def _refresh_on_change(cls):
     """Give every property without its own update callback motion.refresh, so the
     viewport follows the sliders while the animation is paused."""
-    skip = {'is_baking', 'prepared_id', 'prepared_mode', 'original_mesh'}
+    skip = {'is_baking', 'prepared_id', 'prepared_mode', 'original_mesh', 'instancer', 'is_learning'}
     for name, prop in cls.__annotations__.items():
         if name not in skip and 'update' not in prop.keywords:
             cls.__annotations__[name] = prop.function(**prop.keywords, update=motion.refresh)
@@ -177,6 +298,8 @@ def _refresh_on_change(cls):
 
 classes = [_refresh_on_change(cls) for cls in [
     AudvisMotionAudioProperties,
+    AudvisMotionCCProperties,
+    AudvisMotionAttractorProperties,
     AudvisMotionCascadeProperties,
     AudvisMotionScatterProperties,
     AudvisMotionOrbitProperties,

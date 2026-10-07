@@ -7,8 +7,9 @@ from .audio import MotionAudio
 class MotionEngine:
     """Runs the Motion FX (cascade, scatter, orbit) of every object once per frame."""
 
-    def __init__(self, driver):
+    def __init__(self, driver, cc_reader=None):
         self.driver = driver
+        self.cc_reader = cc_reader  # (control, channel) -> 0..1 or None
         self.audio = MotionAudio()
         self._cache = {}
         self._reported = set()
@@ -36,7 +37,7 @@ class MotionEngine:
                 self._run(cascade.update, obj, scene, frame)
             if props.orbit.enable:
                 self._run(orbit.update, obj, scene, frame)
-            if props.scatter.enable and obj.type == 'MESH':
+            if props.scatter.enable and obj.type in ('MESH', 'GREASEPENCIL'):
                 self._run(scatter.update, obj, scene, frame)
 
     def _run(self, func, obj, scene, frame):
