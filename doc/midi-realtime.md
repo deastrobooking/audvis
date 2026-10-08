@@ -7,9 +7,14 @@ panel header.
 ## MIDI Mappings (map knobs, faders and pads)
 
 1. Enable **Midi Realtime** and add your controller (**Add Midi Input**, pick the **Input Device**).
-2. **Right-click any value** in Blender - an object's Location X, a light's Power, a material or Geometry Nodes
-   input, the Motion FX **Master** or an effect's **Influence**, an EQ gain - and choose **AudVis: MIDI Learn**.
-3. Move a knob or fader, or hit a pad. Done - it's in the **MIDI Mappings** list.
+2. Click **Map Mode** (top of the Midi Realtime panel).
+3. **Click any value** in Blender - an object's Location X, a light's Power, a material or Geometry Nodes input,
+   the Motion FX **Master** or an effect's **Influence**, an EQ gain. Dragging or typing a new value works too.
+   The panel and the status bar show what is armed.
+4. Move a knob or fader, or hit a pad. Done - it's in the **MIDI Mappings** list.
+5. Repeat 3-4 for the next value. Click **Map Mode** again or press **Esc** when you're done.
+
+Mapping a value again replaces its knob. Without Map Mode you can also right-click a value > **AudVis: MIDI Learn**.
 
 Mappings work while playing and while paused, in every scene of the file. In the list, select a mapping to tune it:
 

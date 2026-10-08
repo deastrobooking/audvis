@@ -117,7 +117,7 @@ Party Mode adds a temporary `audvis-party` workspace and deletes it again on exi
 - Keep the sidebar (**N**) open on the AudVis tab of your control screen to adjust Driver Values (multiplier, noise,
   fade-out) during the set. See [Driver Values](./driver-values.md).
 - Use **MIDI Realtime** to drive values from a controller's knobs and pads: right-click any value > **AudVis:
-  MIDI Learn**, move a knob. Map pads to scene switching and Motion FX Engage / Release / Stop. See
+  MIDI Learn**, move a knob - or switch on **Map Mode** and map one value after another. Map pads to scene switching and Motion FX Engage / Release / Stop. See
   [MIDI Mappings](./midi-realtime.md#midi-mappings-map-knobs-faders-and-pads).
 - Bring Motion FX in and out with the live strip at the top of the **Motion FX** panel: **Master**, and
   Engage / Release / Stop per effect or for everything. Your scene's own animation keeps playing underneath. See

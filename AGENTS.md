@@ -41,7 +41,9 @@ performance tools. The maintainer develops on an Apple-silicon Mac with **Blende
   reference. `MidiRealtimeAnalyzer.snapshot()` reads them while paused; `device_key()` maps panel names to hardware.
 - MIDI Mappings (`ui/midi/mapping.py`, math in `analyzer/midi_map.py` without bpy): mappings live in
   `scene.audvis.midi_realtime.maps`, are applied by a 60 Hz timer (not frame handlers) from every scene, and are
-  created by right-click > AudVis: MIDI Learn (`UI_MT_button_context_menu` + `ui.copy_data_path_button`). Prefer
+  created by Map Mode (`ui/midi/map_mode.py`: hovered button via `context.property` under a region
+  `temp_override`, or a changed value found by diffing RNA snapshots of depsgraph-updated IDs) or right-click >
+  AudVis: MIDI Learn (`UI_MT_button_context_menu`, same `context.property` lookup). Prefer
   this over new one-off "Learn" buttons; Motion FX CC Control and EQ Map predate it.
 
 - Motion FX props get an automatic `update=motion.refresh` via `_refresh_on_change` in `ui/props/motion.py`;

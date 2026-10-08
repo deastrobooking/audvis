@@ -17,6 +17,7 @@ preferences = bpy.context.preferences.addons.new()
 preferences.module = ROOT.name
 audvis.register()
 mapping = importlib.import_module(ROOT.name + ".ui.midi.mapping")
+map_mode = importlib.import_module(ROOT.name + ".ui.midi.map_mode")
 realtime = importlib.import_module(ROOT.name + ".analyzer.midi_realtime")
 thread_mod = importlib.import_module(ROOT.name + ".analyzer.midi_realtime.midi_thread")
 
@@ -209,6 +210,70 @@ try:
     new = scene.audvis.midi_realtime.maps[-1]
     assert len(scene.audvis.midi_realtime.maps) == before + 1
     assert (new.kind, new.number, new.channel, new.data_path, new.index) == ('cc', 21, 2, 'scale', 0)
+
+    # --- Map Mode: change a value (or click it), move a knob -> mapped
+    assert mapping.full_path_of(cube, "location", 2) == "bpy.data.objects['Cube'].location[2]"
+    assert mapping.parse(mapping.full_path_of(cube, '["glow"]')) == ('objects', 'Cube', '["glow"]', -1)
+    assert mapping.hovered_path(bpy.context) == "", "nothing hovered in background mode"
+    snap = map_mode.snapshot(cube)
+    assert "location[2]" in snap and "audvis.orbit.influence" in snap and '["glow"]' in snap
+    cube.color[1] = .25
+    assert map_mode.changed(snap, map_mode.snapshot(cube)) == ["color[1]"]
+
+    map_mode._mode = {"scene": scene.name, "start_msg": fake.last_msg, "armed": "", "armed_label": "",
+                      "last": "", "pending": set(), "ids": {}, "snapshots": {}, "stop": False}
+    bpy.app.handlers.depsgraph_update_post.append(map_mode._on_depsgraph)
+    map_mode._start_watching(NS(scene=scene, active_object=cube))
+    mode_op = NS(_timer=None, report=lambda *a: None, _analyzer=map_mode.AUDVIS_OT_midiMapMode._analyzer,
+                 _finish=lambda ctx: map_mode.AUDVIS_OT_midiMapMode._finish(mode_op, ctx))
+    fake_ctx = NS(workspace=None, window_manager=NS(windows=[], event_timer_remove=lambda t: None))
+
+    def mode_tick():
+        bpy.context.view_layer.update()  # fires depsgraph_update_post like a UI edit would
+        return map_mode.AUDVIS_OT_midiMapMode.modal(mode_op, fake_ctx, NS(type='TIMER', value='NOTHING'))
+
+    m0 = scene.audvis.midi_realtime.maps[0]  # CC 7 -> location Z: its writes must not arm anything
+    fake.cc(7, 100)
+    tick()
+    mode_tick()
+    assert not map_mode._mode["armed"], "a value written by a mapping isn't 'touched'"
+    map_mode.RESNAP = 60  # snapshots are throttled per ID: a change right after one waits
+    cube.color[0] = .5  # the user changes a value...
+    mode_tick()
+    assert not map_mode._mode["armed"] and map_mode._mode["pending"], "deferred, not lost"
+    map_mode.RESNAP = 0
+    mode_tick()
+    assert map_mode._mode["armed"] == "bpy.data.objects['Cube'].color[0]", map_mode._mode["armed"]
+    assert map_mode.armed_label() == "Cube > Color R", map_mode.armed_label()
+    count = len(scene.audvis.midi_realtime.maps)
+    fake.cc(30, 64)  # ...and moves a knob
+    mode_tick()
+    maps = scene.audvis.midi_realtime.maps
+    assert len(maps) == count + 1 and (maps[-1].number, maps[-1].data_path, maps[-1].index) == (30, 'color', 0)
+    assert not map_mode._mode["armed"] and "CC 30 ch1 > Cube > Color R" in map_mode.last_mapped(), map_mode.last_mapped()
+    fake.cc(31, 64)  # a knob with nothing armed does nothing
+    mode_tick()
+    assert len(scene.audvis.midi_realtime.maps) == count + 1
+    map_mode.arm("bpy.data.objects['Cube'].color[0]")  # same value again: re-assign, no duplicate
+    fake.pad(50, 100)
+    mode_tick()
+    maps = scene.audvis.midi_realtime.maps
+    assert len(maps) == count + 1 and (maps[-1].kind, maps[-1].number) == ('note', 50)
+    map_mode.arm("bpy.data.scenes['Scene'].audvis.midi_realtime.maps[0].range_max")
+    assert not map_mode._mode["armed"], "the mapping settings themselves aren't mappable"
+    helper = bpy.data.objects.new("helper", None)
+    helper["audvis_motion_helper"] = True
+    scene.collection.objects.link(helper)
+    map_mode._watch(helper)
+    helper.location.x = 3
+    mode_tick()
+    assert not map_mode._mode["armed"], "AudVis' own helpers are ignored"
+    for state in (True, False):
+        map_mode.draw_button(MockLayout(), NS())
+    map_mode._mode["stop"] = True
+    assert mode_tick() == {'FINISHED'} and map_mode._mode is None
+    assert map_mode._on_depsgraph not in bpy.app.handlers.depsgraph_update_post
+    map_mode.draw_button(MockLayout(), NS())
 
     # --- UI draws, timer and context menu don't fail
     for i in range(len(scene.audvis.midi_realtime.maps)):

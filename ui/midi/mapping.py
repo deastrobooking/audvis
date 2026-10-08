@@ -20,6 +20,7 @@ from ..buttonspanel import AudVisButtonsPanel_Npanel
 TICK = 1 / 60
 _states = {}  # mapping uid -> midi_map.MapState
 _reported = set()
+written = set()  # (ID pointer, data path, index) the mappings wrote - Map Mode ignores these changes
 _PATH = re.compile(r'^bpy\.data\.(\w+)\[("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')\]\.?(.*)$')
 _ATTR = re.compile(r'^(?:(.*)\.)?(\w+)$')
 _KEY = re.compile(r'^(.*)\[("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')\]$')
@@ -277,6 +278,7 @@ def apply(snapshot, analyzer, playing):
                 continue
             target.write(value)
             state.written = target.read()
+            written.add((target.idb.as_pointer(), m.data_path, m.index))
             changed = True
             if m.record and playing:
                 target.idb.keyframe_insert(m.data_path, index=m.index, frame=scene.frame_current)
@@ -315,9 +317,35 @@ def _tick():
 
 # ---------------------------------------------------------------- operators
 
-def _copy_path(context):
-    """Full data path of the button under the mouse (works from its right-click menu)."""
-    wm = context.window_manager
+def full_path_of(idb, path, index=-1):
+    """bpy.data path of a property: (ID, path from the ID, array index) -> 'bpy.data.objects["Cube"].location[2]'."""
+    if idb is None or not path:
+        return ""
+    base = repr(idb)  # bpy.data.objects['Cube'] (embedded data: bpy.data.materials['M'].node_tree)
+    if not base.startswith("bpy.data."):
+        return ""
+    full = base + ("" if path.startswith("[") else ".") + path
+    return full + ("[{}]".format(index) if index is not None and index >= 0 else "")
+
+
+def hovered_path(context):
+    """Full data path of the value under the mouse / right-clicked, or ""."""
+    prop = getattr(context, "property", None)  # (ID, path, index) of the hovered button
+    if prop:
+        idb, path, index = prop
+        full = full_path_of(idb, path, index)
+        if full:
+            return full
+    pointer, rna = getattr(context, "button_pointer", None), getattr(context, "button_prop", None)
+    if pointer is not None and rna is not None and pointer.id_data is not None:
+        try:
+            path = pointer.path_from_id(rna.identifier)
+        except ValueError:
+            path = ""
+        full = full_path_of(pointer.id_data, path)
+        if full and not getattr(rna, "is_array", False):
+            return full
+    wm = context.window_manager  # last resort: what Copy Full Data Path would copy
     old = wm.clipboard
     try:
         bpy.ops.ui.copy_data_path_button(full_path=True)
@@ -352,7 +380,7 @@ class AUDVIS_OT_midiMapLearn(Operator):
         scene = context.scene
         if self.map_index < 0 and not self.action:
             if not self.full_path:
-                self.full_path = _copy_path(context)
+                self.full_path = hovered_path(context)
             try:
                 parse(self.full_path)
             except ValueError as e:
@@ -472,7 +500,8 @@ class AUDVIS_PT_midiMapsNpanel(AudVisButtonsPanel_Npanel):
         props = context.scene.audvis.midi_realtime
         if not props.enable:
             layout.label(text="Enable MIDI Realtime above", icon='INFO')
-        layout.label(text="Right-click any value > AudVis: MIDI Learn", icon='EVENT_M')
+        from . import map_mode
+        map_mode.draw_button(layout, context)
         row = layout.row()
         row.template_list("AUDVIS_UL_midiMaps", "", props, "maps", props, "maps_index", rows=4)
         col = row.column(align=True)
