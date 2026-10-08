@@ -74,6 +74,10 @@ class AudVis:
     def driver(self, low=None, high=None, ch=None, **kwargs):
         start = time.time()
         scene = bpy.context.scene
+        if "cc" in kwargs:  # audvis(cc=7): MIDI CC as 0..1, not scaled by the Driver Values settings
+            channel = int(ch) if ch not in (None, 'all') else -1
+            value = self.midi_cc(kwargs["cc"], channel, kwargs.get("device"))
+            return 0.0 if value is None else value
 
         if "midi" not in kwargs and "midi_control" not in kwargs and ch is None:
             ch = scene.audvis.default_channel_sound
@@ -269,7 +273,7 @@ class AudVis:
             self.motion_engine = MotionEngine(self.driver, self.midi_cc)
         return self.motion_engine
 
-    def midi_cc(self, control, channel=-1):
+    def midi_cc(self, control, channel=-1, device=None):
         """Last value (0..1) of a MIDI CC from the realtime MIDI input, None if not received yet.
         Read directly, so Motion FX live controls aren't scaled by the driver value settings."""
         analyzer = self.midi_realtime_analyzer
@@ -278,8 +282,11 @@ class AudVis:
         data = analyzer._last_data_controls
         if not data:
             return None
-        for device in list(data.values()):
-            for ch, controls in list(device.items()):
+        device_key = analyzer.device_key(device)
+        for key, device_data in list(data.items()):
+            if device_key is not None and key != device_key:
+                continue
+            for ch, controls in list(device_data.items()):
                 if channel >= 0 and ch != channel:
                     continue
                 if control in controls:

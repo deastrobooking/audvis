@@ -35,6 +35,14 @@ performance tools. The maintainer develops on an Apple-silicon Mac with **Blende
   wall-clock, runtime only) x `scene.audvis.motion_master`. Switching an effect off must release its layer
   (`_on_disable` in `ui/motion.py`).
 - Dynamic enum items (e.g. `CC_TARGETS`) are saved by position - only append.
+- Adding to a `CollectionProperty` can move its items in memory: re-fetch item references after `.add()`.
+- MIDI: one subprocess per device (`analyzer/midi_realtime/midi_realtime_proxy.py`, mido + pygame backend) feeds
+  `MidiThread`; it replaces (never mutates) `data` / `data_controls` / `note_counts`, so readers just take the
+  reference. `MidiRealtimeAnalyzer.snapshot()` reads them while paused; `device_key()` maps panel names to hardware.
+- MIDI Mappings (`ui/midi/mapping.py`, math in `analyzer/midi_map.py` without bpy): mappings live in
+  `scene.audvis.midi_realtime.maps`, are applied by a 60 Hz timer (not frame handlers) from every scene, and are
+  created by right-click > AudVis: MIDI Learn (`UI_MT_button_context_menu` + `ui.copy_data_path_button`). Prefer
+  this over new one-off "Learn" buttons; Motion FX CC Control and EQ Map predate it.
 
 - Motion FX props get an automatic `update=motion.refresh` via `_refresh_on_change` in `ui/props/motion.py`;
   add internal/state props to its `skip` set.
@@ -56,9 +64,10 @@ B=/Applications/Blender.app/Contents/MacOS/Blender
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_motion_smoke.py
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_motion_features_smoke.py
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_motion_layer_smoke.py
+$B --background --factory-startup --python-exit-code 1 --python tests/blender_midi_map_smoke.py
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_grease_pencil_smoke.py
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_compatibility_smoke.py -- "$(mktemp -d)"
-python3 -m unittest tests.test_blender_compatibility tests.test_grease_pencil_compat
+python3 -m unittest tests.test_blender_compatibility tests.test_grease_pencil_compat tests.test_midi_map
 ```
 
 Headless tests can't exercise drawing, windows or real MIDI hardware – say so when reporting UI work.

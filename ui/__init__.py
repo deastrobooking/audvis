@@ -140,6 +140,7 @@ def register():
     partymode.register()
     spread_drivers.register()
     eq.register()
+    midi.register()
     bpy.types.Scene.audvis = bpy.props.PointerProperty(type=props.scene.AudvisSceneProperties)
     bpy.types.Object.audvis = bpy.props.PointerProperty(type=props.obj.AudvisObjectProperties)
     if hasattr(bpy.types, "SoundSequence"):
@@ -159,6 +160,7 @@ def unregister():
     partymode.unregister()
     spread_drivers.unregister()
     eq.unregister()
+    midi.unregister()
     motion.unregister()
     realtime.unregister()
     video.unregister()
