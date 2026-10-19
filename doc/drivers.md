@@ -55,3 +55,35 @@ Here are some simple expressions to show what you probably want to do:
 - almost any nodes in geometry nodes, shading, compositing...
 - depth of field settings
 - just experiment! Explore all the possibilities (impossible) and have fun
+## Beat outputs and Sound Links
+
+The **Beat** sidebar panel selects Audio, MIDI Clock, or Tap as the tempo source. Driver expressions:
+
+```python
+audvis(beat='pulse')  # short 0/1 beat pulse
+audvis(beat='phase')  # quarter-note phase, 0..1
+audvis(beat='bar')    # four-beat bar phase, 0..1
+audvis(beat='bpm')    # tempo in beats per minute
+audvis(beat='onset')  # 1 on a detected audio onset frame
+```
+
+These outputs bypass Driver Values scaling. Audio onset detection compares positive spectral
+flux across 16 log-spaced bands against an adaptive median threshold, with a 100 ms refractory
+period. Tempo uses recent onset intervals within the configured BPM range. Detection is sampled
+once per frame: low frame rates and complex rhythms reduce accuracy. File audio uses timeline
+time; live audio, MIDI Clock and Tap use monotonic time. Seeking backward resets audio tracking;
+play from the start to establish tempo. Live tempo is not a recording of your performance.
+
+To link sound without typing a driver, enter **Map Mode**, arm a numeric property, then click
+one of the band 1–8 buttons or **Beat pulse / Beat phase / Bar phase**. The new mapping uses
+Range, Curve, Invert, Smoothing and Record from MIDI Mappings. Sound links work with MIDI
+Realtime disabled and run in the frame handler before Motion FX, including during rendering.
+Map Mode can start with MIDI Realtime disabled for sound-only linking.
+EQ levels include the band's gain and use the same 0..1 scale as the meters. Sound sources have
+no MIDI device/channel filtering. Band sources use numbers 1–8; beat sources use 0–2.
+
+Smoothing retains frame history during forward playback and resets on seeks; it is not an
+arbitrary-order animation cache. Use zero smoothing for direct frame-independent EQ links,
+or Record/bake the result of sequential playback. Multiple mappings to one property compete;
+use one active source per target. A property with a driver or f-curve can override a link, as
+shown by the mapping status message.

@@ -27,7 +27,9 @@ class AudvisMotionAudioProperties(bpy.types.PropertyGroup):
     response: bpy.props.EnumProperty(name="Response", default='follow', items=[
         ('follow', "Follow", "Follow the loudness (smoothed by Attack / Release)"),
         ('trigger', "Beat Trigger", "Fire a one-shot envelope (0..1) when the sound crosses the Threshold"),
+        ('beat', "On Beat", "Envelope from the scene beat tracker"),
     ])
+    beat_every: bpy.props.EnumProperty(name="Every", items=[('1', "Beat", ""), ('2', "2 Beats", ""), ('4', "4 Beats", ""), ('0', "Onset", "")])
     threshold: bpy.props.FloatProperty(name="Threshold", default=.5, min=0, soft_max=5,
                                        description="Value (after Sensitivity) that fires a trigger")
     trigger_length: bpy.props.IntProperty(name="Length (frames)", default=24, min=1, soft_max=250)
@@ -204,6 +206,9 @@ class AudvisMotionScatterProperties(bpy.types.PropertyGroup):
     amount: bpy.props.FloatProperty(name="Amount", default=0, min=0, max=1, subtype='FACTOR',
                                     description="0 = assembled, 1 = fully scattered. Fluid: how hard the flow"
                                                 " is stirred. Keyframe it")
+    fluid_use_bake: bpy.props.BoolProperty(name="Use Bake", default=False, description="Replay the fluid cache for exact scrubbing and rendering")
+    fluid_bake_path: bpy.props.StringProperty(name="Bake File", subtype='FILE_PATH',
+        options={'PATH_SUPPORTS_BLEND_RELATIVE'} if bpy.app.version >= (5, 2, 0) else set(), description="Compressed fluid particle cache")
     fluid_resolution: bpy.props.IntProperty(name="Resolution", default=24, min=8, soft_max=40, max=64,
                                             description="Fluid grid cells per side. Higher = finer swirls,"
                                                         " slower (24: ~10 ms per frame)")

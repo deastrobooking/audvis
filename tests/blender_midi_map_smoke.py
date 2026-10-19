@@ -285,6 +285,9 @@ try:
     mapping.draw_context_menu(NS(layout=MockLayout()), NS())
     assert mapping._tick() == mapping.TICK
     assert not mapping._reported, mapping._reported
+    sys.path.insert(0, str(ROOT / "tests"))
+    import live_features
+    live_features.run(ROOT.name, scene)
     print("PASS: MIDI Mappings", bpy.app.version_string)
 finally:
     bpy.audvis.midi_realtime_analyzer = None

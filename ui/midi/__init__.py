@@ -1,7 +1,7 @@
-from . import realtime, file, mapping, map_mode
+from . import realtime, file, mapping, map_mode, profiles
 from .realtime import input_device_options
 
-classes = file.classes + realtime.classes + mapping.classes + map_mode.classes
+classes = file.classes + realtime.classes + mapping.classes + map_mode.classes + profiles.classes
 
 
 def register():

@@ -6,7 +6,7 @@ import subprocess
 import sys
 import threading
 import time
-from copy import deepcopy
+from ..beat import MidiClock
 from dataclasses import dataclass
 # https://www.midi.org/specifications-old/item/table-1-summary-of-midi-message
 from glob import glob
@@ -126,6 +126,11 @@ class MidiThread(threading.Thread):
     debug_mode = False
     last_notes_list = None
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.clocks = {}
+        self.recent = collections.deque(maxlen=8)
+
     def run(self):
         self.python_path = glob(os.path.join(os.path.realpath(sys.prefix), 'bin', 'python*'))[0]
         self.inputs = {}
@@ -146,6 +151,14 @@ class MidiThread(threading.Thread):
             input = self.inputs[key]
             while not input['queue'].empty():
                 line = input['queue'].get()
+                parts = line.split()
+                if parts and parts[0] in ('clock', 'start', 'stop', 'continue'):
+                    try:
+                        stamp = float(parts[1]) if len(parts) > 1 else time.monotonic()
+                    except ValueError:
+                        continue
+                    self.clocks.setdefault(key, MidiClock()).receive(parts[0], stamp)
+                    continue
                 match = self.regexp_control.match(line)
                 if match:
                     if match.group(2) == 'c':
@@ -167,6 +180,7 @@ class MidiThread(threading.Thread):
                     if self.debug_mode:
                         print(msg)
                     self.last_msg = msg
+                    self.recent.append(msg)
                     msgs.append(msg)
         if len(msgs):
             self._process_messages(msgs)
@@ -176,9 +190,21 @@ class MidiThread(threading.Thread):
         return msg1.time
 
     def _process_messages(self, msgs):
-        data_notes = deepcopy(self.data)
-        data_controls = deepcopy(self.data_controls)
-        note_counts = deepcopy(self.note_counts)
+        def copy_touched(source, selected):
+            out = nested_dict()
+            out.update(source or {})
+            touched = {(m.input_name, m.channel) for m in selected}
+            for device in {d for d, _ in touched}:
+                out[device] = nested_dict()
+                out[device].update((source or {}).get(device, {}))
+            for device, channel in touched:
+                out[device][channel] = dict((source or {}).get(device, {}).get(channel, {}))
+            return out
+        notes = [m for m in msgs if isinstance(m, _MidiNoteMessage)]
+        controls = [m for m in msgs if isinstance(m, _MidiControlMessage)]
+        data_notes = copy_touched(self.data, notes)
+        data_controls = copy_touched(self.data_controls, controls)
+        note_counts = copy_touched(self.note_counts, notes)
         for msg in msgs:
             if type(msg) == _MidiNoteMessage:
                 val = msg.velocity * 1.0 if msg.on else 0.0
@@ -187,7 +213,7 @@ class MidiThread(threading.Thread):
                     channel_counts[msg.note] = channel_counts.get(msg.note, 0) + 1
                 data_notes[msg.input_name][msg.channel][msg.note] = val
                 if val == 0.0:
-                    del data_notes[msg.input_name][msg.channel][msg.note]
+                    data_notes[msg.input_name][msg.channel].pop(msg.note, None)
                     if len(data_notes[msg.input_name][msg.channel]) == 0:
                         del data_notes[msg.input_name][msg.channel]
                         if len(data_notes[msg.input_name]) == 0:

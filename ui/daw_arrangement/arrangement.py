@@ -205,7 +205,7 @@ class Arrangement:
 
     def load_audio(self, filepath: str, identifier: str, samplerate: int):
         if not os.path.exists(filepath):
-            print("File not found: ", filepath)
+            if getattr(self, "debug", False): print("File not found: ", filepath)
             return
         sound = aud.Sound(filepath)
         sound = sound.rechannel(1)
@@ -268,7 +268,8 @@ class Arrangement:
                     if note.duration <= threshold:
                         note.duration = default_duration
 
-    def print(self):
+    def print(self, debug=False):
+        if not debug: return
         print('ARRANGEMENT duration: {} basic_bpm: {}'.format(self.duration, self.basic_bpm))
         for t in self.tracks:
             print(' TRACK: {}'.format(t.name))

@@ -13,6 +13,7 @@ from . import (
     motion,
     daw_arrangement, realtimeprops,
     eq,
+    snapshots,
 )
 
 classes = [
@@ -23,7 +24,7 @@ classes = [
               spectrogram.AudvisSpectrogramProperties,
               spectrogram.AudvisSpectrogramMetaProperties,
               spreaddrivers.AudvisSceneSpreaddriversProperties,
-          ] + motion.classes + eq.classes + [
+          ] + motion.classes + eq.classes + snapshots.classes + [
               scene.AudvisSceneProperties,  # all prop groups in scene need to be above this line
               sequence.AudvisSequenceProperties,
               shapemodifier.AudvisObjectShapemodifierProperties,

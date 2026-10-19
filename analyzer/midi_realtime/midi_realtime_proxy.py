@@ -1,5 +1,6 @@
 import argparse
 import sys
+import time
 
 parser = argparse.ArgumentParser(description='test')
 parser.add_argument('--libs-path', required=False)
@@ -20,7 +21,9 @@ input = mido.open_input(name=args.input_name)
 try:
     while True:
         msg = input.receive()
-        if msg.type == 'control_change':
+        if msg.type in ('clock', 'start', 'stop', 'continue'):
+            print(msg.type, time.monotonic(), flush=True)
+        elif msg.type == 'control_change':
             print(msg.channel + 1, "c{}".format(msg.control), msg.value)
             sys.stdout.flush()
         elif msg.type in ('note_on', 'note_off'):

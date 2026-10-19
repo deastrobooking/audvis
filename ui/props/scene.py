@@ -11,6 +11,7 @@ from . import (
     daw_arrangement,
     realtimeprops,
     eq,
+    snapshots,
 )
 from .. import (
     values,
@@ -27,6 +28,12 @@ realtime_enable = global_settings.GlobalSettings('realtime_enable', default=Fals
 
 
 class AudvisSceneProperties(bpy.types.PropertyGroup):
+    beat_source: bpy.props.EnumProperty(name="Beat Source", items=[('audio', "Audio", "Timeline for files; live time for realtime"), ('midi', "MIDI Clock", "External 24 PPQN clock"), ('tap', "Tap", "Tap tempo")])
+    beat_sensitivity: bpy.props.FloatProperty(name="Onset Threshold", default=1.5, min=.1, max=10, description="Adaptive flux threshold multiplier")
+    beat_bpm_min: bpy.props.FloatProperty(name="Minimum BPM", default=60, min=20, max=300)
+    beat_bpm_max: bpy.props.FloatProperty(name="Maximum BPM", default=180, min=20, max=300)
+    realtime_switch_bars: bpy.props.IntProperty(name="Switch Every N Bars", default=0, min=0, description="0 switches at scene end; positive values switch after N bars")
+
 
     def get_sound_sequences(self, context):
         res = [("", "---", "")]
@@ -36,6 +43,9 @@ class AudvisSceneProperties(bpy.types.PropertyGroup):
             if seq.type == 'SOUND':
                 res.append((seq.name, seq.name, seq.name))
         return res
+
+    snapshots: bpy.props.CollectionProperty(type=snapshots.AudvisSnapshot)
+    snapshots_index: bpy.props.IntProperty(name="Snapshot", default=0)
 
     # party mode
     party: bpy.props.PointerProperty(type=party.AudvisPartyProperties)

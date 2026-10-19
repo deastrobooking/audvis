@@ -139,6 +139,18 @@ class MotionAudio:
 
     def values(self, key, props, driver, count, scene, frame):
         """One value per element. Follow mode: smoothed sound. Trigger mode: 0..1 envelopes."""
+        if props.response == 'beat':
+            from ...ui.beat import tracker
+            beat = tracker(scene)
+            every = int(props.beat_every)
+            counter = beat.counter // every if every else beat.onset_count
+            def hit(before):
+                last, onset = before if before is not None else ([counter] * count, None)
+                if counter != last[0]: onset = frame
+                return [counter] * count, onset
+            _, onset = self._step('beat', key, frame, count, hit)
+            value = 0 if onset is None else envelope(props.trigger_shape, (frame-onset)/max(1, props.trigger_length))
+            return [value] * count
         raw = self.raw_values(key, props, driver, count, scene, frame)
         if props.response == 'trigger':
             return self._trigger(key, props, raw, count, frame)

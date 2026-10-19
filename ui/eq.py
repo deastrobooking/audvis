@@ -182,6 +182,14 @@ class AUDVIS_PT_eqWindow(bpy.types.Panel):
         draw_eq(self.layout, context)
 
 
+def band_level(scene, i):
+    """Band i (zero based), with the shared EQ gain, in the current scene context."""
+    if not 0 <= i < BAND_COUNT: return 0.0
+    band = bands(scene)[i]
+    value = bpy.audvis.driver(EQ_EDGES[i], EQ_EDGES[i+1], ch=scene.audvis.eq_channel)
+    return min(1.0, max(0.0, value * .1 * eq_gain(band, bpy.audvis._get_motion_engine().cc_reader)))
+
+
 def update_meters():
     try:
         context = bpy.context
@@ -192,8 +200,7 @@ def update_meters():
         changed = False
         for i, band in enumerate(bands(scene)):
             try:
-                value = bpy.audvis.driver(EQ_EDGES[i], EQ_EDGES[i + 1], ch=scene.audvis.eq_channel)
-                level = min(1.0, max(0.0, value * .1 * eq_gain(band, engine.cc_reader)))
+                level = band_level(scene, i)
             except Exception:
                 level = 0.0
             key = (scene.name, i)

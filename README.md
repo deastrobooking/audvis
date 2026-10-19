@@ -3,6 +3,11 @@
 AudVis is a Blender 4.2 and higher add-on (extension) helping you to build awesome audio visualizations. The main features are Real
 Time Analyzer and Sequence Analyzer.
 
+Live performance tools include [Fluid Scatter baking and presets](doc/motion.md#fluid-scatter),
+[beat drivers and Sound Links](doc/drivers.md#beat-outputs-and-sound-links),
+[parameter snapshots and bar switching](doc/performing.md#tempo-and-switching-on-bars), and
+[MIDI clock, portable profiles, bank fill and monitoring](doc/midi-realtime.md#clock-profiles-bank-fill-and-monitor).
+
 ## Important links:
 
 - **[Download](https://github.com/example-sk/audvis/releases)**

@@ -253,10 +253,8 @@ class AUDVIS_OT_midiMapMode(Operator):
             _mode["stop"] = True
             return {'FINISHED'}
         analyzer = self._analyzer(context.scene)
-        if analyzer is None:
-            self.report({'ERROR'}, "Enable MIDI Realtime and add your controller first")
-            return {'CANCELLED'}
-        _mode = {"scene": context.scene.name, "start_msg": analyzer.get_last_msg(), "armed": "",
+        _mode = {"scene": context.scene.name, "start_msg": analyzer.get_last_msg() if analyzer else None,
+                 "midi_started": analyzer is not None, "armed": "",
                  "armed_label": "", "last": "", "pending": set(), "ids": {}, "snapshots": {}, "stop": False,
                  "started": time.monotonic()}
         _start_watching(context)
@@ -297,7 +295,7 @@ class AUDVIS_OT_midiMapMode(Operator):
         if event.type != 'TIMER':
             return {'PASS_THROUGH'}
         analyzer = self._analyzer(scene)
-        if analyzer is None:
+        if analyzer is None and _mode.get('midi_started', True):
             self.report({'WARNING'}, "MIDI Realtime stopped - Map Mode off")
             self._finish(context)
             return {'CANCELLED'}
@@ -307,7 +305,7 @@ class AUDVIS_OT_midiMapMode(Operator):
             arm(touched)
             _status(context)
             _redraw(context)
-        msg = analyzer.get_last_msg()
+        msg = analyzer.get_last_msg() if analyzer else None
         if msg is not None and msg is not _mode["start_msg"] and (hasattr(msg, "control") or msg.on):
             _mode["start_msg"] = msg
             if _mode["armed"]:
@@ -330,7 +328,15 @@ def draw_button(layout, context):
         box = col.box().column(align=True)
         if armed_label():
             box.label(text=armed_label(), icon='RADIOBUT_ON')
-            box.label(text="Now move a knob, fader or pad")
+            box.label(text="Move a MIDI control, or link a sound source below")
+            row = box.row(align=True)
+            for i in range(1, 9):
+                op = row.operator('audvis.midi_map_link', text=str(i))
+                op.kind, op.number = 'eq', i
+            row = box.row(align=True)
+            for i, name in enumerate(('Beat pulse', 'Beat phase', 'Bar phase')):
+                op = row.operator('audvis.midi_map_link', text=name)
+                op.kind, op.number = 'beat', i
         else:
             box.label(text="Click a value to map", icon='RESTRICT_SELECT_OFF')
         if last_mapped():
@@ -344,6 +350,21 @@ def unregister():
         bpy.app.handlers.depsgraph_update_post.remove(_on_depsgraph)
 
 
+class AUDVIS_OT_midiMapLink(bpy.types.Operator):
+    bl_idname = 'audvis.midi_map_link'
+    bl_label = 'Link Sound to Armed Value'
+    kind: bpy.props.EnumProperty(items=[('eq', 'EQ', ''), ('beat', 'Beat', '')])
+    number: bpy.props.IntProperty(default=1, min=0, max=8)
+    def execute(self, context):
+        if _mode is None or not _mode.get('armed'): return {'CANCELLED'}
+        m = mapping.create(context.scene, self.kind, self.number, full_path=_mode['armed'])
+        _mode['last'] = mapping.source_label(m) + ' > ' + mapping.target_label(m)
+        _mode['armed'] = _mode['armed_label'] = ''
+        _status(context)
+        _redraw(context)
+        return {'FINISHED'}
+
 classes = [
+    AUDVIS_OT_midiMapLink,
     AUDVIS_OT_midiMapMode,
 ]

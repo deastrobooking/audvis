@@ -8,7 +8,17 @@ def try_switch_scenes(current_scene):
         return False
     if current_scene.frame_current == current_scene.frame_start:
         return False
-    if current_scene.frame_current != current_scene.frame_end:
+    bars = current_scene.audvis.realtime_switch_bars
+    if bars:
+        from .ui.beat import tracker, _switches
+        t = tracker(current_scene)
+        boundary = t.counter // (4 * bars)
+        key = current_scene.as_pointer()
+        before = _switches.get(key, boundary)
+        _switches[key] = boundary
+        if boundary <= before:
+            return False
+    elif current_scene.frame_current != current_scene.frame_end:
         return False
     if current_scene.frame_start == current_scene.frame_end:
         return False
@@ -42,6 +52,9 @@ def try_switch_scenes(current_scene):
 def switch_window_scene(window, scene):
     """Show `scene` in `window` from its first frame and (re)start playback."""
     _skip_to_start(scene)
+    if scene.audvis.realtime_switch_bars:
+        from .ui.beat import tracker, _switches
+        _switches[scene.as_pointer()] = tracker(scene).counter // (4 * scene.audvis.realtime_switch_bars)
     window.scene = scene
     # Scene changes are evaluated after the caller returns in newer Blender
     # versions, so restarting playback synchronously can leave it stopped (or

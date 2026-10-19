@@ -344,7 +344,23 @@ def compute_fluid(settings, cache, values, t, mods, matrix, field_list, scene, f
     def run_step(dt):
         flow.step(settings, energy, t, dt, targets, push, flow=mods["amount"])
 
-    if not flow.advance(frame, scene.frame_start, scene.frame_end, fps, run_step, settings.fluid_keep_on_loop):
+    if settings.fluid_use_bake:
+        import os
+        import bpy
+        path = bpy.path.abspath(settings.fluid_bake_path)
+        stamp = (path, os.stat(path).st_mtime_ns)
+        if cache.get('bake_stamp') != stamp:
+            cache['bake_data'] = fluid.load_bake(path)
+            cache['bake_stamp'] = stamp
+        signature, frames = cache['bake_data'][cache.get('bake_key', 'mesh')]
+        if signature != fluid.fingerprint(cache['rest'], cache['pieces']):
+            raise ValueError('Fluid bake topology changed; bake again')
+        if frame not in frames:
+            raise ValueError('Frame missing from fluid bake; bake the full render range')
+        flow.pos, flow.rot = frames[frame]
+        flow.frame = frame
+        flow.replayed = True
+    elif not flow.advance(frame, scene.frame_start, scene.frame_end, fps, run_step, settings.fluid_keep_on_loop):
         flow.reset(centers, frame)
     positions = flow.pos
     if field_list:
@@ -395,6 +411,7 @@ def update(engine, obj, scene, frame):
             n = len(drawing.attributes[REST].data)
             cache = engine.cached(key + (layer.name, gp_frame.frame_number),
                                   (n, settings.seed, settings.prepared_id), lambda: gp_cache(drawing, settings.seed))
+            cache['bake_key'] = layer.name + ':' + str(gp_frame.frame_number)
             _run(engine, obj, settings, cache, values, t, mods, field_list, lambda co: gp_write(drawing, co),
                  influence, scene, frame)
 

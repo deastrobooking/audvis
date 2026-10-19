@@ -229,6 +229,13 @@ class AUDVIS_PT_midiRealtimeNpanel(AudVisButtonsPanel_Npanel):
         col = layout.column(align=True)
         col.operator("audvis.midi_realtime_restart")
         col.operator("audvis.midi_realtime_debug", icon="INFO")
+        analyzer = bpy.audvis.midi_realtime_analyzer
+        box = layout.box()
+        box.label(text="MIDI Monitor")
+        for msg in analyzer.recent() if analyzer is not None else ():
+            cc = hasattr(msg, 'control')
+            box.label(text="{} {}: {} ch{} {}".format('CC' if cc else 'Note', msg.control if cc else msg.note,
+                           msg.value if cc else msg.velocity, msg.channel, msg.input_name))
 
 
 classes = [

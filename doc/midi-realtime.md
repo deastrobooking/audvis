@@ -69,3 +69,29 @@ You don't need to look up CC numbers. With MIDI Realtime enabled, click **Learn*
 [MIDI CC Control](./motion.md#live-controls-midi-cc) box, or **Map** under an
 [EQ / Macros](./motion.md#eq--macros) gain slider, then move a knob or fader. Esc cancels; after 15 seconds
 without a message it cancels by itself, and it also cancels if MIDI Realtime is switched off while waiting.
+
+## Clock, profiles, bank fill and monitor
+
+MIDI Clock, Start, Stop and Continue are received separately from controller messages. Select
+**Beat > Source > MIDI Clock** to use 24 ticks per quarter note; Start resets the beat count,
+Stop suppresses pulses, and Continue resumes. Tempo becomes available after 24 tick intervals
+and is unavailable after half a second without a tick. Clock messages do not trigger Learn or
+Map Mode. If several devices provide clocks, the first valid clock supplies both tempo and
+transport; enable only the intended clock input for a show. **Tap Tempo** switches to Tap;
+you can also map the **Tap Tempo** action to a pad or CC button.
+
+**MIDI Mappings > Export Profile** saves a versioned JSON file with every mapping setting.
+**Import Profile** appends by default; enable **Replace Existing** in the file browser to replace
+all mappings in this scene. Imported mappings receive fresh runtime IDs. Object and scene names
+are kept as data paths: when importing into another blend file, inspect **Target not found**
+statuses and update paths. Profiles include sound links and snapshot actions, but do not contain
+the snapshots themselves or controller device setup.
+
+Learn fader 1 onto `eq_band_1.gain`, select that mapping, then choose **Fill Bank**, Bank Size 8.
+This keeps the first mapping and adds seven copies, incrementing both the MIDI number and the
+last integer in the property path. Array components such as `[0]` also work. Missing targets
+and MIDI numbers above 127 are skipped. Bank Size includes the selected control.
+
+The **MIDI Monitor** at the bottom of MIDI Realtime displays the eight most recent note/CC
+messages, including type, number, value, channel and device. It does not include timing ticks.
+The **Recall Snapshot** action has a snapshot selector; snapshots belong to the mapping's scene.

@@ -57,6 +57,23 @@ performance tools. The maintainer develops on an Apple-silicon Mac with **Blende
   `AUDVIS_PT_Bge` never registers in regular Blender (expected). `SoundSequence` became `SoundStrip`.
 - Match the surrounding style: short docstrings, `bpy.props` annotations, descriptions on user-facing props.
 
+## Live performance runtime
+
+- `analyzer/beat.py` has no bpy dependency: `BeatTracker` takes seconds and log-band energies;
+  `MidiClock` consumes timestamped 24 PPQN ticks. `ui/beat.py` keeps per-scene tracker state,
+  readouts and consumed bar boundaries outside RNA. Audio files use timeline seconds; live
+  sources use monotonic time. MIDI clock lines never update `last_msg` or enter Learn.
+- `AudVis.update_data` updates analyzers, then beat, then frame-applied `mapping.apply_sound`,
+  before Motion FX. The MIDI timer skips `eq` and `beat` mapping kinds. Sound-link smoothing
+  resets on seeks; it is not a render cache. Use zero smoothing or record sequential playback.
+- All saved enums are append-only, including mapping kind/action and Motion FX response.
+- `ui/snapshots.py` captures property paths and values, not RNA references. `_jobs` holds
+  runtime morphs; file load/unregister clears them. Snapshots are parameter-only: no effect
+  enable flags or runtime gates. Numeric values morph; bools/enums switch at the end.
+- Fluid disk bakes use explicit samples, not bounded `Flow.history`. Archives validate geometry
+  fingerprints and separate GP layer/drawing streams. Position-history replay cannot resume
+  future velocity state; leaving replay resets the simulation. Clear Bake detaches, keeps disk file.
+
 ## Test
 
 All of these must pass before committing (headless, ~1 min total):
@@ -69,8 +86,13 @@ $B --background --factory-startup --python-exit-code 1 --python tests/blender_mo
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_midi_map_smoke.py
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_grease_pencil_smoke.py
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_compatibility_smoke.py -- "$(mktemp -d)"
-python3 -m unittest tests.test_blender_compatibility tests.test_grease_pencil_compat tests.test_midi_map
+$B --background --factory-startup --python-exit-code 1 --python tests/blender_fluid_smoke.py
+python3 -m unittest tests.test_blender_compatibility tests.test_grease_pencil_compat tests.test_midi_map tests.test_beat
 ```
+
+`tests/blender_midi_map_smoke.py` also runs `tests/live_features.py` (sound links, snapshots,
+profiles, clock, copy-on-write and strict panel/operator/icon probes). Optional
+`tests/blender_fluid_preview.py` renders six Workbench frames per preset to `dist/fluid-preview/`.
 
 Headless tests can't exercise drawing, windows or real MIDI hardware – say so when reporting UI work.
 

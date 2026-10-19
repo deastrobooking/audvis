@@ -191,3 +191,59 @@ doesn't need baking - keyframe *Amount* instead. Instances can't be baked.
 
 The settings are in `obj.audvis.cascade`, `obj.audvis.scatter`, `obj.audvis.orbit` and `obj.audvis.attractor`;
 Motion FX for the scene is `scene.audvis.motion_enable`.
+
+## Fluid Scatter
+
+Choose **Scatter > Style > Fluid** after **Tear Apart**, or start with **Ink in Water**,
+**Smoke Storm**, or **Liquid Shards** in the preset menu. Ink sinks slowly with high
+viscosity; Smoke rises with strong turbulence; Liquid uses bursts and swirl with Return 1.
+This is a particle simulation carried by a small incompressible fluid grid, not a liquid surface solver.
+
+| Control | Effect |
+|---|---|
+| Flow (Amount) | Scales the forces driving the fluid and sound kicks. |
+| Resolution | Grid cells per axis; higher values cost more time and memory. Start at 24. |
+| Domain Size | Grid extent relative to the original piece centers. |
+| Seed | Repeatable turbulent flow pattern. Reset after changing it. |
+| Swirl | Circular force around local Z; negative reverses it. |
+| Turbulence | Strength of the moving curl noise. |
+| Turbulence Scale | Noise detail; higher values give smaller curls. |
+| Turbulence Speed | How quickly the noise pattern changes. |
+| Vorticity | Reinforces small swirls in the velocity field. |
+| Viscosity | Blends neighboring velocities, making the flow thicker and smoother. |
+| Damping | Removes fluid velocity over time. |
+| Buoyancy | Force along local Z; positive rises, negative sinks. |
+| Follow | How closely pieces follow grid velocity. |
+| Spin | How strongly local vorticity rotates pieces. |
+| Return | Pulls pieces and their orientation back toward rest, or the morph target. |
+| Shrink | Reduces piece size as Flow increases. |
+| Sound Burst | Radial sound kicks; negative values pull inward. |
+| Sound → Turbulence / Vorticity | Modulate those forces with the selected sound source. |
+| Morph / Morph Scale / Sound Morph | Set the shape Return pulls toward and its piece fitting. |
+| Influence / Master | Blend the resulting motion toward the assembled geometry. |
+
+Sound sensitivity, frequency band, stereo spread and response work as for other Motion FX.
+**On Beat** uses the Beat panel's tracker; choose every beat, every 2 or 4 beats, or every onset,
+and use the existing envelope Shape and Length controls.
+
+### Playback and baking
+
+An unbaked flow depends on the frames that were simulated. Play from the scene's first frame.
+Recent positions can be replayed while scrubbing, but simulation velocities are not restored by
+position replay: when you leave that recorded section the flow restarts. Jump to the first frame
+or use **Reset Fluid** to start over. **Keep Flowing on Loop** carries the running flow across
+playback wraps; switch it off for a repeatable first pass.
+
+Save the blend file, then click **Bake Fluid**. The modal bake resets the simulation and steps
+every integer frame from scene Start through End, including both endpoints, writing
+`//audvis_cache/<object>_fluid.npz`. Grease Pencil layers/drawings have separate streams in that
+file. The bake captures frames explicitly, so it is not limited by the 3,000-frame live history.
+**Esc** cancels without replacing an existing cache. Successful baking enables **Use Bake**.
+The cache can be scrubbed or rendered in any integer frame order. Keep the cache folder with
+the blend file. **Clear Bake** detaches it and resumes live simulation; the file stays on disk.
+
+Bake again after changing simulation settings, source audio, piece topology, or the frame range.
+The archive validates the rest geometry and piece IDs before replay. Missing frames/files and
+changed geometry are reported in the console. Subframe cache interpolation is not provided.
+Morph fitting, attractors, Shrink and Influence remain evaluated controls; retain their original
+settings and use file audio for reproducible sound-driven controls during final rendering.

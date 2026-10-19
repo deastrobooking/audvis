@@ -25,9 +25,11 @@ class AudvisMidiMapProperties(bpy.types.PropertyGroup):
     kind: bpy.props.EnumProperty(name="Type", items=[
         ('cc', "CC", "Knob, fader or CC button"),
         ('note', "Note", "Pad or key"),
+        ('eq', "EQ Band", "Sound level of band 1–8"),
+        ('beat', "Beat", "0 pulse, 1 beat phase, 2 bar phase"),
     ], update=_map_update)
     number: bpy.props.IntProperty(name="Number", min=0, max=127, update=_map_update,
-                                  description="CC number or note number")
+                                  description="CC/note number; EQ band 1–8; beat 0 pulse, 1 phase, 2 bar")
     channel: bpy.props.IntProperty(name="Channel", default=0, min=0, max=16, update=_map_update,
                                    description="MIDI channel, 0 = any")
     device: bpy.props.StringProperty(name="Device", update=_map_update,
@@ -52,8 +54,11 @@ class AudvisMidiMapProperties(bpy.types.PropertyGroup):
         ('engage', "Motion FX: Engage All", ""),
         ('release', "Motion FX: Release All", ""),
         ('stop', "Motion FX: Stop All", ""),
+        ('tap', "Tap Tempo", ""),
+        ('snapshot', "Recall Snapshot", ""),
     ], update=_map_update)
     scene_name: bpy.props.StringProperty(name="Scene")
+    snapshot_name: bpy.props.StringProperty(name="Snapshot")
     # response
     response: bpy.props.EnumProperty(name="Response", items=[
         ('range', "Fader / Knob", "Follow the knob (pads: velocity while held)"),

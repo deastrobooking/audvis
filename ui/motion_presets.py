@@ -34,6 +34,15 @@ PRESETS = {
         }),
     ],
     'scatter': [
+        ('ink', 'Ink in Water', 'Viscous ink sinks in gentle curls', {
+            'style': 'fluid', 'amount': 1, 'fluid_viscosity': .7, 'fluid_buoyancy': -.6,
+            'fluid_turbulence': .3, 'fluid_vorticity': 1, 'fluid_burst': 2, 'fluid_swirl': .5, 'fluid_return': .1}),
+        ('smoke', 'Smoke Storm', 'Buoyant, turbulent smoke', {
+            'style': 'fluid', 'amount': 1, 'fluid_viscosity': .02, 'fluid_buoyancy': 2,
+            'fluid_turbulence': 7, 'fluid_vorticity': 6, 'fluid_burst': 4, 'fluid_swirl': 2, 'fluid_return': .1}),
+        ('liquid', 'Liquid Shards', 'Strong bursts and swirl, drawn back together', {
+            'style': 'fluid', 'amount': 1, 'fluid_viscosity': .1, 'fluid_buoyancy': 0,
+            'fluid_turbulence': 2, 'fluid_vorticity': 2, 'fluid_burst': 16, 'fluid_swirl': 8, 'fluid_return': 1}),
         ("supernova", "Supernova", "Explodes on every beat, falls back together", {
             "piece_mode": 'faces', "direction": 'outward', "distance": 6, "rotation": 360, "shrink": .3,
             "audio.response": 'trigger', "audio.trigger_shape": 'decay', "audio.trigger_length": 30,
@@ -91,7 +100,8 @@ BASELINE = {"audio.source": 'sound', "audio.response": 'follow', "audio.spread":
 def apply(settings, effect, key):
     for k, label, desc, values in PRESETS[effect]:
         if k == key:
-            for path, value in {**BASELINE, **values}.items():
+            defaults = {"style": 'explode', "fluid_use_bake": False} if effect == 'scatter' else {}
+            for path, value in {**BASELINE, **defaults, **values}.items():
                 owner = settings
                 *parents, name = path.split(".")
                 for parent in parents:
@@ -124,6 +134,11 @@ class AUDVIS_OT_motionPreset(bpy.types.Operator):
         elif self.effect == 'orbit':
             bpy.ops.audvis.motion_orbit_populate()
         elif obj.type in ('MESH', 'GREASEPENCIL'):
+            engine = motion._engine()
+            if engine is not None:
+                for key in list(engine._cache):
+                    if key[:2] == ('scatter', obj.name):
+                        engine.invalidate(key)
             if not motion.scatter_prepared(obj) or settings.prepared_mode != settings.piece_mode:
                 bpy.ops.audvis.motion_scatter_prepare()
             settings.enable = True

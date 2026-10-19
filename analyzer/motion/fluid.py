@@ -129,6 +129,7 @@ class Flow:
         self.vel = np.zeros_like(self.pos)
         self.rot = np.tile([1.0, 0, 0, 0], (len(centers), 1))
         self.frame = None
+        self.replayed = False
         self.history = {}  # frame -> (pos, rot) for scrubbing back over simulated frames
 
     def signature(self):
@@ -152,7 +153,8 @@ class Flow:
         self.vel = np.zeros_like(self.pos)
         self.rot = np.tile([1.0, 0, 0, 0], (len(centers), 1))
         self.frame = frame
-        self.history = {}
+        self.replayed = False
+        self.history = {frame: (self.pos.copy(), self.rot.copy())}
 
     def step(self, p, energy, t, dt, targets, piece_push, flow=1.0):
         """Advance one step. p: fluid settings (fluid_* fields), energy: sound 0..~1, flow: Amount
@@ -223,10 +225,15 @@ class Flow:
             run_step(1.0 / fps)
             self.frame = frame
             return True
-        if frame in self.history and (self.frame is None or frame < self.frame):
+        if frame <= frame_start:
+            return False
+        if frame in self.history and (self.replayed or self.frame is None or frame < self.frame):
             self.pos, self.rot = (a.copy() for a in self.history[frame])
             self.frame = frame
+            self.replayed = True
             return True
+        if self.replayed:
+            return False
         if frame <= frame_start or self.frame is None or not 0 < frame - self.frame <= MAX_STEP_FRAMES:
             return False
         frames = frame - self.frame
@@ -245,3 +252,49 @@ class Flow:
         scale = np.asarray(scale, dtype=float)
         rel = (rest - centers[pieces]) * (scale[pieces][:, None] if scale.ndim else scale)
         return positions[pieces] + quat_rotate(self.rot[pieces], rel)
+
+
+def fingerprint(rest, pieces):
+    import hashlib
+    h = hashlib.sha256()
+    h.update(np.asarray(rest, dtype=np.float64).tobytes())
+    h.update(np.asarray(pieces, dtype=np.int32).tobytes())
+    return h.hexdigest()
+
+
+def save_bake(path, streams):
+    """Write every sampled frame, including frame_start, with no history limit."""
+    import json
+    import os
+    arrays, metadata = {}, {}
+    for i, (key, stream) in enumerate(streams.items()):
+        frames = sorted(stream['frames'])
+        prefix = 's' + str(i)
+        arrays[prefix + '_frames'] = np.asarray(frames, dtype=np.int32)
+        arrays[prefix + '_pos'] = np.stack([stream['frames'][f][0] for f in frames])
+        arrays[prefix + '_rot'] = np.stack([stream['frames'][f][1] for f in frames])
+        metadata[key] = [prefix, stream['fingerprint']]
+    arrays['metadata'] = np.asarray(json.dumps({'version': 1, 'streams': metadata}))
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    temporary = path + '.tmp.npz'
+    try:
+        np.savez_compressed(temporary, **arrays)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary): os.unlink(temporary)
+
+
+def load_bake(path):
+    import json
+    with np.load(path, allow_pickle=False) as archive:
+        meta = json.loads(str(archive['metadata']))
+        if meta.get('version') != 1: raise ValueError('Unsupported fluid bake version')
+        result = {}
+        for key, (prefix, signature) in meta['streams'].items():
+            frames = archive[prefix + '_frames']
+            pos, rot = archive[prefix + '_pos'], archive[prefix + '_rot']
+            if pos.ndim != 3 or pos.shape[-1] != 3 or rot.shape != pos.shape[:2] + (4,) or len(frames) != len(pos):
+                raise ValueError('Invalid fluid bake shape')
+            if not np.isfinite(pos).all() or not np.isfinite(rot).all(): raise ValueError('Invalid fluid bake values')
+            result[key] = (signature, {int(f): (p, r) for f, p, r in zip(frames, pos, rot)})
+        return result

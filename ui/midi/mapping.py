@@ -11,6 +11,7 @@ import uuid
 
 import bpy
 from bpy.types import Operator, UIList
+from bpy.app.handlers import persistent
 
 from ...analyzer import midi_map
 from ...switchscenes import switch_window_scene
@@ -20,6 +21,7 @@ from ..buttonspanel import AudVisButtonsPanel_Npanel
 TICK = 1 / 60
 _states = {}  # mapping uid -> midi_map.MapState
 _reported = set()
+_last_monitor = None
 written = set()  # (ID pointer, data path, index) the mappings wrote - Map Mode ignores these changes
 _PATH = re.compile(r'^bpy\.data\.(\w+)\[("(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\')\]\.?(.*)$')
 _ATTR = re.compile(r'^(?:(.*)\.)?(\w+)$')
@@ -156,6 +158,12 @@ def default_range(target):
 
 def status(m):
     """None, or (icon, text) explaining why a mapping may not act as expected."""
+    if m.kind == 'eq' and not 1 <= m.number <= 8:
+        return 'ERROR', "EQ band number must be 1–8"
+    if m.kind == 'beat' and not 0 <= m.number <= 2:
+        return 'ERROR', "Beat number must be 0 (pulse), 1 (phase), or 2 (bar)"
+    if m.kind in {'eq', 'beat'} and m.target != 'property':
+        return 'ERROR', "Sound Links control properties"
     if m.target == 'action':
         return None
     target = resolve(m)
@@ -174,6 +182,8 @@ def status(m):
 
 
 def source_label(m):
+    if m.kind == 'eq': return f'EQ {m.number}'
+    if m.kind == 'beat': return 'Beat ' + {0: 'pulse', 1: 'phase', 2: 'bar phase'}.get(m.number, '?')
     if m.kind == 'cc':
         text = "CC {}".format(m.number)
     else:
@@ -217,7 +227,7 @@ def create(scene, kind, number, channel=0, device="", full_path="", action=None)
     m = maps.add()
     m.uid = uuid.uuid4().hex
     m.kind, m.number, m.channel, m.device = kind, number, channel, device
-    m.response = 'range' if kind == 'cc' else 'momentary'
+    m.response = 'range' if kind in {'cc', 'eq', 'beat'} else 'momentary'
     if action is not None:
         m.target, m.action = 'action', action
     else:
@@ -232,6 +242,14 @@ def _window():
 
 
 def run_action(m):
+    if m.action == 'tap':
+        from ..beat import tap
+        tap(m.id_data)
+        return
+    if m.action == 'snapshot':
+        from ..snapshots import recall
+        recall(m.id_data, m.snapshot_name)
+        return
     window = _window()
     if window is None:
         return
@@ -257,7 +275,7 @@ def apply(snapshot, analyzer, playing):
     changed = False
     for scene in bpy.data.scenes:
         for m in scene.audvis.midi_realtime.maps:
-            if not m.enable or not m.uid:
+            if not m.enable or not m.uid or m.kind in {'eq', 'beat'}:
                 continue
             state = _states.get(m.uid)
             if state is None:
@@ -285,7 +303,39 @@ def apply(snapshot, analyzer, playing):
     return changed
 
 
+_sound_frames = {}
+
+def apply_sound(scene):
+    """Frame-applied sound mappings. Repeated frames are idempotent; seeks reset smoothing."""
+    from .. import eq, beat
+    frame = scene.frame_current_final
+    key = scene.as_pointer()
+    previous = _sound_frames.get(key)
+    _sound_frames[key] = frame
+    levels = {}
+    for m in scene.audvis.midi_realtime.maps:
+        if not m.enable or m.kind not in {'eq', 'beat'} or m.target != 'property': continue
+        if previous is None or frame < previous or frame > previous + 1:
+            forget(m)
+
+        if m.kind == 'eq':
+            if m.number not in levels: levels[m.number] = eq.band_level(scene, m.number-1)
+            raw = levels[m.number]
+        else:
+            raw = beat.tracker(scene).output({0:'pulse', 1:'phase', 2:'bar'}.get(m.number, ''))
+        target = resolve(m)
+        if target is None: continue
+        state = _states.setdefault(m.uid, midi_map.MapState())
+        value = midi_map.step(m, state, raw, raw >= .5, 0, target.read())
+        if value is None: continue
+        target.write(value)
+        state.written = target.read()
+        written.add((target.idb.as_pointer(), m.data_path, m.index))
+        if m.record: target.idb.keyframe_insert(m.data_path, index=m.index, frame=frame)
+
+
 def _tick():
+    global _last_monitor
     try:
         scene = bpy.context.scene
         audvis = getattr(bpy, "audvis", None)
@@ -300,7 +350,12 @@ def _tick():
             return TICK
         wm = bpy.context.window_manager
         playing = any(w.screen.is_animation_playing for w in wm.windows) if wm is not None else False
-        if apply(snapshot, analyzer, playing) and wm is not None:
+        changed = apply(snapshot, analyzer, playing)
+        recent = analyzer.recent() if hasattr(analyzer, 'recent') else ()
+        monitor = tuple(getattr(msg, 'time', 0) for msg in recent)
+        redraw = changed or monitor != _last_monitor
+        _last_monitor = monitor
+        if redraw and wm is not None:
             for window in wm.windows:  # live values in the sidebar
                 for area in window.screen.areas:
                     for region in area.regions:
@@ -499,9 +554,13 @@ class AUDVIS_PT_midiMapsNpanel(AudVisButtonsPanel_Npanel):
         layout = self.layout
         props = context.scene.audvis.midi_realtime
         if not props.enable:
-            layout.label(text="Enable MIDI Realtime above", icon='INFO')
+            layout.label(text="MIDI inputs disabled; Sound Links still work", icon='INFO')
         from . import map_mode
         map_mode.draw_button(layout, context)
+        row = layout.row(align=True)
+        row.operator('audvis.midi_profile_export')
+        row.operator('audvis.midi_profile_import')
+        layout.operator('audvis.midi_fill_bank')
         row = layout.row()
         row.template_list("AUDVIS_UL_midiMaps", "", props, "maps", props, "maps_index", rows=4)
         col = row.column(align=True)
@@ -517,19 +576,23 @@ class AUDVIS_PT_midiMapsNpanel(AudVisButtonsPanel_Npanel):
         row = box.row(align=True)
         row.prop(m, "kind", text="")
         row.prop(m, "number", text="")
-        row.prop(m, "channel", text="Ch")
-        row.operator("audvis.midi_map_learn", text="", icon='EYEDROPPER').map_index = index
-        box.prop(m, "device", icon='PLUGIN')
+        if m.kind in {'cc', 'note'}:
+            row.prop(m, "channel", text="Ch")
+            row.operator("audvis.midi_map_learn", text="", icon='EYEDROPPER').map_index = index
+            box.prop(m, "device", icon='PLUGIN')
         state = _states.get(m.uid)
         if state is not None and state.raw is not None:
             box.progress(factor=state.raw, type='BAR', text="Input {:.0f}%".format(state.raw * 100))
 
         box = layout.box().column(align=True)
-        box.row().prop(m, "target", expand=True)
+        if m.kind in {'cc', 'note'}:
+            box.row().prop(m, "target", expand=True)
         if m.target == 'action':
             box.prop(m, "action", text="")
             if m.action == 'scene':
                 box.prop_search(m, "scene_name", bpy.data, "scenes")
+            if m.action == 'snapshot':
+                box.prop_search(m, 'snapshot_name', context.scene.audvis, 'snapshots')
             return
         box.prop(m, "full_path", text="")
         box.label(text=target_label(m))
@@ -553,17 +616,31 @@ class AUDVIS_PT_midiMapsNpanel(AudVisButtonsPanel_Npanel):
         col.prop(m, "record")
 
 
+@persistent
+def clear_runtime(_dummy=None):
+    global _last_monitor
+    _states.clear()
+    _sound_frames.clear()
+    _reported.clear()
+    written.clear()
+    _last_monitor = None
+
+
 def register():
+    if clear_runtime not in bpy.app.handlers.load_pre:
+        bpy.app.handlers.load_pre.append(clear_runtime)
     bpy.types.UI_MT_button_context_menu.append(draw_context_menu)
     if not bpy.app.timers.is_registered(_tick):
         bpy.app.timers.register(_tick, first_interval=.5, persistent=True)
 
 
 def unregister():
+    if clear_runtime in bpy.app.handlers.load_pre:
+        bpy.app.handlers.load_pre.remove(clear_runtime)
     bpy.types.UI_MT_button_context_menu.remove(draw_context_menu)
     if bpy.app.timers.is_registered(_tick):
         bpy.app.timers.unregister(_tick)
-    _states.clear()
+    clear_runtime()
 
 
 classes = [

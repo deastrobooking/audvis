@@ -137,3 +137,31 @@ Party Mode adds a temporary `audvis-party` workspace and deletes it again on exi
 | Visuals lag behind the music | Set **Sync Mode** to *Frame Dropping*, lower **Subframes**, or use lighter shading. |
 | Party Mode won't close | Press **Esc** with the mouse over the full-screen view, or stop playback and click the close button in the bottom right. |
 | A scene button does nothing | The scene may have been renamed or deleted. Check the warning in the status bar. |
+
+## Tempo and switching on bars
+
+Set the **Beat** panel to Audio for onset-based tempo, MIDI Clock for an external sequencer,
+or use **Tap Tempo**. The panel shows BPM and four beat lights without writing meter values
+into the blend file. The onset threshold multiplier and BPM range tune audio detection.
+
+With Realtime and Auto Switch Scenes enabled, **Switch Every N Bars** uses four beats per
+bar. Zero preserves the existing scene-end behavior; a positive value switches after that
+many bar boundaries. Each boundary is consumed once. Switching still requires viewport playback
+and does not run during final renders. Tap and MIDI clocks continue while playback is paused;
+audio detection updates on frame changes.
+
+## Parameter snapshots
+
+**Snapshots > Capture** stores Motion FX Master, the Influence of every set-up effect, Scatter
+Amount, all eight EQ gains, and targets of all property mappings in this scene. Rename a row,
+select it and use **Update** to replace its captured values or **Delete** to remove it.
+**Recall** morphs numeric values over Motion Fade Time; checkboxes and enums switch at the end.
+Zero fade time recalls immediately. A second recall replaces the pending morph from the values
+currently on screen. Missing/renamed targets are skipped. MIDI Pickup waits for a controller to
+reach the recalled value when it next moves.
+
+These are parameter snapshots: they do not capture effect Enable flags, Engage/Release gates,
+fluid state, scene contents, or animation actions. Engage an effect before recalling its strength.
+A controller mapping or animation can write the same target during a morph, so release the
+controller or disable competing mappings when you want a clean transition. Morph jobs are runtime
+only and are cancelled on file load or add-on disable. Snapshot values are saved in the blend.

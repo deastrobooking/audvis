@@ -15,6 +15,27 @@ class MidiRealtimeAnalyzer(Analyzer):
             return None
         return thread.last_msg
 
+    def clock_state(self):
+        """Use one device consistently for tempo and transport."""
+        import time
+        clocks = getattr(self._thread, 'clocks', {})
+        for clock in clocks.values():
+            if clock.bpm(time.monotonic()) is not None:
+                return clock
+        return None
+
+    def clock_bpm(self):
+        import time
+        clock = self.clock_state()
+        return clock.bpm(time.monotonic()) if clock else None
+
+    def transport(self):
+        clock = self.clock_state()
+        return bool(clock and clock.running)
+
+    def recent(self):
+        return tuple(getattr(self._thread, 'recent', ()))
+
     def snapshot(self):
         """Latest (notes, controls, note-on counts), straight from the thread - also while paused.
         The thread replaces these dicts instead of changing them, so reading them is safe."""

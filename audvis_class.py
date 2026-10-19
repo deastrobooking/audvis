@@ -74,6 +74,9 @@ class AudVis:
     def driver(self, low=None, high=None, ch=None, **kwargs):
         start = time.time()
         scene = bpy.context.scene
+        if "beat" in kwargs:
+            from .ui.beat import tracker
+            return tracker(scene).output(kwargs["beat"])
         if "cc" in kwargs:  # audvis(cc=7): MIDI CC as 0..1, not scaled by the Driver Values settings
             channel = int(ch) if ch not in (None, 'all') else -1
             value = self.midi_cc(kwargs["cc"], channel, kwargs.get("device"))
@@ -179,8 +182,6 @@ class AudVis:
         scene = bpy.context.scene
         # if scene != bpy.context.scene:  # material preview panel
         #    return
-        if try_switch_scenes(scene):
-            return
         Analyzer.fake_highpass_settings = (scene.audvis.value_highpass_freq, scene.audvis.value_highpass_factor, True)
         if scene.audvis.value_aud.enable:
             Analyzer.aud_filters = scene.audvis.value_aud
@@ -219,6 +220,12 @@ class AudVis:
             if scene.audvis.midi_file.enable:
                 self.get_midi_file_analyzer(scene).on_pre_frame(scene, frame)
             self.scripting.run(self)
+        from .ui import beat
+        from .ui.midi import mapping
+        beat.update(scene)
+        mapping.apply_sound(scene)
+        if try_switch_scenes(scene):
+            return
         video_analyzer = self.get_video_analyzer(scene)
         if video_analyzer is not None and video_analyzer.supported:
             video_analyzer.on_pre_frame(scene, frame)

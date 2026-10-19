@@ -17,6 +17,8 @@ from . import (
     shapemodifier,
     motion,
     eq,
+    beat,
+    snapshots,
     global_settings,
     drivers_bake,
     spectrogram,
@@ -140,6 +142,8 @@ def register():
     partymode.register()
     spread_drivers.register()
     eq.register()
+    beat.register()
+    snapshots.register()
     midi.register()
     bpy.types.Scene.audvis = bpy.props.PointerProperty(type=props.scene.AudvisSceneProperties)
     bpy.types.Object.audvis = bpy.props.PointerProperty(type=props.obj.AudvisObjectProperties)
@@ -160,6 +164,8 @@ def unregister():
     partymode.unregister()
     spread_drivers.unregister()
     eq.unregister()
+    beat.unregister()
+    snapshots.unregister()
     midi.unregister()
     motion.unregister()
     realtime.unregister()
@@ -196,7 +202,7 @@ classes = [
           + video.classes \
           + shapemodifier.classes \
           + motion.classes \
-          + eq.classes \
+          + eq.classes + beat.classes + snapshots.classes \
           + armature_generator.classes \
           + generator.classes \
           + scripttemplates.classes \

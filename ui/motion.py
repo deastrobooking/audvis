@@ -6,7 +6,7 @@ from bpy.types import Operator
 
 from ..analyzer.motion import instances, layer, scatter
 from ..analyzer.motion.lib import HELPER_KEY, INDEX_KEY
-from . import motion_presets, ui_lib
+from . import motion_presets, ui_lib, fluid_bake
 from .buttonspanel import AudVisButtonsPanel_Npanel
 
 GENERATED_KEY = "audvis_motion_generated"
@@ -653,8 +653,9 @@ def draw_audio(layout, context, props, spread=True):
             box.prop(props, "freq_step")
     box.prop(props, "factor")
     box.prop(props, "response")
-    if props.response == 'trigger':
-        box.prop(props, "threshold")
+    if props.response in {'trigger', 'beat'}:
+        if props.response == 'beat': box.prop(props, 'beat_every')
+        else: box.prop(props, "threshold")
         box.prop(props, "trigger_shape")
         row = box.row(align=True)
         row.prop(props, "trigger_length", text="Length")
@@ -1021,6 +1022,11 @@ class AUDVIS_PT_motionScatterNpanel(_MotionSubpanel):
         box.prop(s, "fluid_return")
         box.prop(s, "shrink", slider=True)
         box.prop(s, "fluid_keep_on_loop")
+        box.prop(s, 'fluid_use_bake')
+        box.prop(s, 'fluid_bake_path')
+        row = box.row(align=True)
+        row.operator('audvis.motion_fluid_bake')
+        row.operator('audvis.motion_fluid_clear')
 
         box = layout.box().column(align=True)
         box.label(text="Morph", icon='MOD_SIMPLEDEFORM')
@@ -1041,7 +1047,7 @@ class AUDVIS_PT_motionScatterNpanel(_MotionSubpanel):
         col.prop(s, "fluid_audio_vorticity")
         draw_cc(layout, context, s.cc, 'scatter')
         draw_attractors(layout, s, 'scatter')
-        layout.label(text="Simulated: play from the first frame to render", icon='INFO')
+        layout.label(text="Play from the first frame, or bake for rendering", icon='INFO')
 
 
 class AUDVIS_OT_motionFluidReset(Operator):
@@ -1146,7 +1152,7 @@ class AUDVIS_PT_motionAttractorNpanel(AudVisButtonsPanel_Npanel):
         draw_cc(layout, context, s.cc, 'attractor')
 
 
-classes = motion_presets.classes + [
+classes = motion_presets.classes + fluid_bake.classes + [
     AUDVIS_OT_motionCascadeGenerate,
     AUDVIS_OT_motionOrbitPopulate,
     AUDVIS_OT_motionClear,
