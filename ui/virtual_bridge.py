@@ -152,6 +152,7 @@ class AUDVIS_OT_virtualBridge(bpy.types.Operator):
 
 
 class AUDVIS_PT_virtualBridge(AudVisButtonsPanel_Npanel):
+    bl_idname = 'AUDVIS_PT_virtualBridge'
     bl_label = 'VIRTUAL Bridge'
 
     @classmethod

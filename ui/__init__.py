@@ -20,6 +20,7 @@ from . import (
     beat,
     snapshots,
     virtual_bridge,
+    virtual_video,
     global_settings,
     drivers_bake,
     spectrogram,
@@ -146,6 +147,7 @@ def register():
     beat.register()
     snapshots.register()
     virtual_bridge.register()
+    virtual_video.register()
     midi.register()
     bpy.types.Scene.audvis = bpy.props.PointerProperty(type=props.scene.AudvisSceneProperties)
     bpy.types.Object.audvis = bpy.props.PointerProperty(type=props.obj.AudvisObjectProperties)
@@ -168,6 +170,7 @@ def unregister():
     eq.unregister()
     beat.unregister()
     virtual_bridge.unregister()
+    virtual_video.unregister()
     snapshots.unregister()
     midi.unregister()
     motion.unregister()
@@ -205,7 +208,7 @@ classes = [
           + video.classes \
           + shapemodifier.classes \
           + motion.classes \
-          + eq.classes + beat.classes + snapshots.classes + virtual_bridge.classes \
+          + eq.classes + beat.classes + snapshots.classes + virtual_bridge.classes + virtual_video.classes \
           + armature_generator.classes \
           + generator.classes \
           + scripttemplates.classes \

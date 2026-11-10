@@ -60,6 +60,33 @@ Receiving Blender frames requires a separate source adapter. The next milestone
 should prototype frame transport, then add execution-time cue messages and
 shared macro identities before coordinated show saving.
 
+## Viewport video stream prototype
+
+The separate **VIRTUAL Viewport Stream** panel sends the selected 3D Viewport
+to a VIRTUAL listener at `127.0.0.1:9010`. Start it explicitly from the target
+3D Viewport; stopping it, loading a file, or disabling AudVis removes the draw
+handler and closes the worker. Host, port and frame-rate controls are session
+settings. Use **Measure only** to inspect readback cost and achieved capture
+rate without opening a network socket. This stream carries video only and does
+not use OSC.
+
+The provisional TCP v1 framing is a 36-byte `!4sHHIIQQI` header (`VFRM`,
+version 1, RGBA8 format 1, width, height, sequence, monotonic nanoseconds,
+payload length), followed by tightly packed top-to-bottom RGBA8 pixels. The
+sender caps output at 3840 × 2160 and 60 fps. It keeps only one pending frame;
+the network thread connects and writes. A socket failure stops capture and
+removes the draw handler. Blender's framebuffer readback still runs synchronously inside the viewport draw callback, so its
+measured cost and color/orientation behavior must be checked on the target
+Blender/GPU before treating these values as a stable protocol.
+
+In VIRTUAL, choose **AudVis stream** for a deck and click **Listen** on port
+9010, then start the sender in Blender. Listener and source state are session
+only. The VIRTUAL receiver accepts localhost connections, validates dimensions
+before allocating a frame, and routes RGBA frames through the deck's existing
+live-frame path. Status includes connection, dimensions, received frames,
+sender sequence gaps, local scheduler drops and time since the last complete
+frame arrived.
+
 The bridge binds only to loopback, consumes at most 32 datagrams of 4096 bytes
 per timer tick, rejects malformed/unsupported packets, retains a fixed set of
 readouts, and applies snapshots on Blender's main thread. It accepts immediate

@@ -74,6 +74,10 @@ performance tools. The maintainer develops on an Apple-silicon Mac with **Blende
   eight snapshot assignments live on `Scene.audvis_virtual`. `analyzer/virtual_osc.py`
   is bpy-free. Launch feedback acknowledges requests, not quantized execution; BPM
   does not synchronize phase. File load disconnects. Keep feedback readouts outside RNA.
+- `ui/virtual_video.py` captures the explicitly selected 3D Viewport from its draw
+  callback and hands frames to a single-slot TCP sender thread. `analyzer/virtual_video.py`
+  defines the provisional 36-byte VFRM v1 header; keep it synchronized with VIRTUAL's
+  `crates/virtual-media/src/audvis_stream.rs` until protocol review.
 - Fluid disk bakes use explicit samples, not bounded `Flow.history`. Archives validate geometry
   fingerprints and separate GP layer/drawing streams. Position-history replay cannot resume
   future velocity state; leaving replay resets the simulation. Clear Bake detaches, keeps disk file.
