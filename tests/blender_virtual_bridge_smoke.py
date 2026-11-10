@@ -21,6 +21,7 @@ for cls in bridge.classes:
     bpy.utils.register_class(cls)
 bridge.register()
 scene = bpy.context.scene
+assert bridge.AUDVIS_PT_virtualBridge.poll(bpy.context), 'Bridge panel must be visible with a scene'
 remote = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 remote.bind(('127.0.0.1', 0))
 remote.settimeout(1)

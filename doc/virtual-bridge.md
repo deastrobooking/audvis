@@ -4,6 +4,12 @@ The AudVis sidebar's **VIRTUAL Bridge** panel connects Blender to VIRTUAL on
 this computer. It sends OSC commands for tempo, A/B crossfader, master opacity,
 blackout, freeze and eight scene launches. It requires no new Python packages.
 
+In Blender's 3D Viewport, press **N**, select the **AudVis** sidebar tab, and
+expand **VIRTUAL Bridge**. Blender 5.2 requires the
+`audvis-8.0.1-blender5.2-macos-arm64.zip` extension build; installing a new
+VIRTUAL executable does not update the Blender extension. After updating the
+extension, restart Blender to load the new panel code.
+
 VIRTUAL's operator editor has three session-only views: **Performance**,
 **Audio**, and **Setup / Connections**. Performance opens by default, and
 Show Mode returns to it. Master opacity, blackout, freeze and the A/B crossfader

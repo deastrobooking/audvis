@@ -154,6 +154,10 @@ class AUDVIS_OT_virtualBridge(bpy.types.Operator):
 class AUDVIS_PT_virtualBridge(AudVisButtonsPanel_Npanel):
     bl_label = 'VIRTUAL Bridge'
 
+    @classmethod
+    def poll(cls, context):
+        return context.scene is not None
+
     def draw(self, context):
         layout = self.layout
         p = context.scene.audvis_virtual
