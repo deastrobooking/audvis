@@ -39,3 +39,5 @@ wheels = [
 [permissions]
 camera = "Put realtime camera into image"
 microphone = "Realtime music analyzing"
+
+network = "Control VIRTUAL and receive its OSC feedback on localhost"

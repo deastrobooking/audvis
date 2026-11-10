@@ -70,6 +70,10 @@ performance tools. The maintainer develops on an Apple-silicon Mac with **Blende
 - `ui/snapshots.py` captures property paths and values, not RNA references. `_jobs` holds
   runtime morphs; file load/unregister clears them. Snapshots are parameter-only: no effect
   enable flags or runtime gates. Numeric values morph; bools/enums switch at the end.
+- `ui/virtual_bridge.py` owns one session-only loopback UDP connection; saved ports and
+  eight snapshot assignments live on `Scene.audvis_virtual`. `analyzer/virtual_osc.py`
+  is bpy-free. Launch feedback acknowledges requests, not quantized execution; BPM
+  does not synchronize phase. File load disconnects. Keep feedback readouts outside RNA.
 - Fluid disk bakes use explicit samples, not bounded `Flow.history`. Archives validate geometry
   fingerprints and separate GP layer/drawing streams. Position-history replay cannot resume
   future velocity state; leaving replay resets the simulation. Clear Bake detaches, keeps disk file.
@@ -88,6 +92,8 @@ $B --background --factory-startup --python-exit-code 1 --python tests/blender_gr
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_compatibility_smoke.py -- "$(mktemp -d)"
 $B --background --factory-startup --python-exit-code 1 --python tests/blender_fluid_smoke.py
 python3 -m unittest tests.test_blender_compatibility tests.test_grease_pencil_compat tests.test_midi_map tests.test_beat
+$B --background --factory-startup --python-exit-code 1 --python tests/blender_virtual_bridge_smoke.py
+python3 -m unittest tests.test_virtual_osc
 ```
 
 `tests/blender_midi_map_smoke.py` also runs `tests/live_features.py` (sound links, snapshots,

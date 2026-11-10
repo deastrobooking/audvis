@@ -86,3 +86,8 @@ python3 -m unittest tests.test_blender_compatibility tests.test_grease_pencil_co
 * [Bake Drivers](doc/bake-drivers.md)
 * [Spread the Drivers](doc/spread-the-drivers.md)
 * [UPBGE](doc/upbge.md)
+
+## VIRTUAL integration
+
+The [VIRTUAL Bridge](doc/virtual-bridge.md) sends local OSC performance commands
+and recalls Blender snapshots from VIRTUAL scene-launch feedback.
