@@ -55,29 +55,30 @@ the assigned snapshot again.
 Sending BPM changes VIRTUAL's tempo only; it does not synchronize Blender phase
 or select a Blender beat source. Use the existing MIDI clock facilities for
 clock synchronization. This bridge does not transmit audio analysis or video.
-VIRTUAL's existing NDI sender is program output, not a Blender input receiver.
-Receiving Blender frames requires a separate source adapter. The next milestone
-should prototype frame transport, then add execution-time cue messages and
-shared macro identities before coordinated show saving.
+VIRTUAL's existing NDI sender carries finished program output. AudVis sends its
+selected Output Image into a VIRTUAL deck through the separate TCP stream below;
+OSC remains control and feedback only. Execution-time cue messages and shared
+macro identities remain later coordination work.
 
-## Viewport video stream prototype
+## Output Image stream prototype
 
-The separate **VIRTUAL Viewport Stream** panel sends the selected 3D Viewport
-to a VIRTUAL listener at `127.0.0.1:9010`. Start it explicitly from the target
-3D Viewport; stopping it, loading a file, or disabling AudVis removes the draw
-handler and closes the worker. Host, port and frame-rate controls are session
-settings. Use **Measure only** to inspect readback cost and achieved capture
-rate without opening a network socket. This stream carries video only and does
-not use OSC.
+The **VIRTUAL Video Stream** subpanel sends AudVis's selected **Output Image**
+to a VIRTUAL listener at `127.0.0.1:9010`. Choose the image in the existing
+Video Capture panel, then start **Send Output Image**. The sender hooks into
+AudVis's normal image refresh, copies image pixels on Blender's main thread,
+and sends them from a worker thread. Host, port and frame-rate controls are
+session settings. **Measure Image** measures the selected image copy without
+networking. **Viewport source** remains available as an alternate source.
+Stopping, loading a file or disabling AudVis closes the worker. This stream
+carries video only and does not use OSC.
 
 The provisional TCP v1 framing is a 36-byte `!4sHHIIQQI` header (`VFRM`,
 version 1, RGBA8 format 1, width, height, sequence, monotonic nanoseconds,
 payload length), followed by tightly packed top-to-bottom RGBA8 pixels. The
 sender caps output at 3840 × 2160 and 60 fps. It keeps only one pending frame;
-the network thread connects and writes. A socket failure stops capture and
-removes the draw handler. Blender's framebuffer readback still runs synchronously inside the viewport draw callback, so its
-measured cost and color/orientation behavior must be checked on the target
-Blender/GPU before treating these values as a stable protocol.
+the network thread connects and writes. A socket failure stops image sends.
+Image freshness, color conversion and copy cost must be checked on the target
+Blender build before treating the protocol as stable.
 
 In VIRTUAL, choose **AudVis stream** for a deck and click **Listen** on port
 9010, then start the sender in Blender. Listener and source state are session

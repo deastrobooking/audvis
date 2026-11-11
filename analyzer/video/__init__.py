@@ -165,6 +165,10 @@ class VideoAnalyzer(Analyzer):
                         # end of hack
                         img.filepath = filename
                     video_to_object.run(scene, self.cv)
+                    # The VIRTUAL sender consumes the selected Output Image
+                    # after its normal AudVis refresh, never from the UI worker.
+                    from ...ui.virtual_video import output_image_updated
+                    output_image_updated(scene, scene.audvis.video_image)
                     self.error = None
         except Exception as e:
             self.error = str(e)
